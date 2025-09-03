@@ -262,12 +262,12 @@ impl GlobalFunctionRegistry {
     }
 }
 
-/*
 #[cfg(test)]
 mod global_registry_tests {
     // 添加测试用例来验证 get_registry_with_tools 功能
-    #[tokio::test]
-    async fn test_get_registry_with_tools() {
+    #[ignore = "reason"]
+    #[test]
+    fn test_get_registry_with_tools() {
         // 重置并初始化注册表
         GlobalFunctionRegistry::reset();
         assert!(GlobalFunctionRegistry::initialize().is_ok());
@@ -322,8 +322,9 @@ mod global_registry_tests {
     }
     use super::*;
 
-    #[tokio::test]
-    async fn test_global_registry_initialization() {
+    #[ignore = "reason"]
+    #[test]
+    fn test_global_registry_initialization() {
         // 重置注册表（用于测试）
         GlobalFunctionRegistry::reset();
 
@@ -357,8 +358,8 @@ mod global_registry_tests {
         assert!(function_names.contains(&"net-ping".to_string()));
     }
 
-    #[tokio::test]
-    async fn test_registry_cloning() {
+    #[test]
+    fn test_registry_cloning() {
         // 初始化全局注册表
         GlobalFunctionRegistry::reset();
         assert!(GlobalFunctionRegistry::initialize().is_ok());
@@ -387,8 +388,9 @@ mod global_registry_tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_double_initialization() {
+    #[ignore = "reason"]
+    #[test]
+    fn test_double_initialization() {
         GlobalFunctionRegistry::reset();
 
         // 第一次初始化
@@ -402,4 +404,3 @@ mod global_registry_tests {
         assert!(registry.is_ok());
     }
 }
-*/
