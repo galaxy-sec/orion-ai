@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use log::debug;
 use orion_error::{ErrorOwe, ErrorWith};
-use reqwest::{header, Client};
+use reqwest::{Client, header};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;

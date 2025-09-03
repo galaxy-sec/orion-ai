@@ -12,7 +12,7 @@ async fn main() -> orion_ai::AiResult<()> {
     env_logger::init();
     GlobalFunctionRegistry::initialize().assert();
 
-    let case_work_path = ensure_path(PathBuf::from("./examples/git_case")).owe_res()?;
+    let _case_work_path = ensure_path(PathBuf::from("./examples/git_case")).owe_res()?;
 
     let ai_exec = AiExecUnitBuilder::new(load_sec_dict().err_conv()?)
         .with_role("developer")

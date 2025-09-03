@@ -62,10 +62,10 @@ impl ThreadFileManager {
         let path_str = storage_path.to_string_lossy();
 
         // 简单的环境变量替换
-        if let Some(env_var) = path_str.strip_prefix('$') {
-            if let Ok(env_value) = std::env::var(env_var) {
-                return PathBuf::from(env_value);
-            }
+        if let Some(env_var) = path_str.strip_prefix('$')
+            && let Ok(env_value) = std::env::var(env_var)
+        {
+            return PathBuf::from(env_value);
         }
 
         storage_path.to_path_buf()

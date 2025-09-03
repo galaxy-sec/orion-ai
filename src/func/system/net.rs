@@ -62,10 +62,8 @@ impl FunctionExecutor for NetworkExecutor {
                         });
 
                         // 尝试提取统计信息
-                        if success {
-                            if let Some(stats) = parse_ping_stats(&result) {
-                                parsed_result["stats"] = stats;
-                            }
+                        if success && let Some(stats) = parse_ping_stats(&result) {
+                            parsed_result["stats"] = stats;
                         }
 
                         Ok(FunctionResult {

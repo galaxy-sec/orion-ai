@@ -1,23 +1,8 @@
 use crate::{
-    client::AiClientTrait, func::registry::FunctionRegistry, types::result::ExecutionResult,
-    AiClient, AiResult, AiRoleID, FunctionResult,
+    AiClient, AiResult, AiRoleID, FunctionResult, client::AiClientTrait,
+    func::registry::FunctionRegistry, types::result::ExecutionResult,
 };
 use getset::{Getters, MutGetters, Setters, WithSetters};
-
-/// AI执行单元，封装AI执行所需的核心组件
-///
-/// 这个结构体将AI客户端、角色和函数注册表组合成一个统一的执行单元，
-/// 提供简洁的接口来执行AI任务。
-///
-/// # 示例
-///
-/// ```rust
-/// use orion_ai::{AiExecUnit, AiClient, AiRoleID, FunctionRegistry};
-///
-/// // 假设已经创建了 client, role, registry
-/// let exec_unit = AiExecUnit::new(client, role, registry);
-/// let response = exec_unit.execute("你好，请介绍一下自己").await?;
-/// ```
 
 #[derive(Getters, MutGetters, Setters, WithSetters)]
 #[getset(get = "pub", set = "pub", get_mut = "pub", set_with = "pub")]

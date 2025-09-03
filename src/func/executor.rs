@@ -92,9 +92,11 @@ mod tests {
         let mut registry = FunctionRegistry::new();
         let executor = Arc::new(MockExecutor::new("test_exec"));
 
-        assert!(registry
-            .register_executor("test_exec".to_string(), executor.clone())
-            .is_ok());
+        assert!(
+            registry
+                .register_executor("test_exec".to_string(), executor.clone())
+                .is_ok()
+        );
         assert!(registry.supports_function("test_exec"));
         assert!(!registry.supports_function("unknown"));
     }

@@ -1,7 +1,7 @@
+use crate::FunctionDefinition;
 use crate::error::AiResult;
 use crate::provider::{AiRequest, AiResponse};
 use crate::roleid::AiRoleID;
-use crate::FunctionDefinition;
 use async_trait::async_trait;
 
 use super::core::AiClient;

@@ -56,16 +56,14 @@ impl ThreadClient {
         let response = self.inner.send_request(enhanced_request).await;
 
         // 如果启用Thread记录且响应成功，则记录交互
-        if self.is_thread_enabled() {
-            if let Ok(ref resp) = response {
-                if let Err(e) = self
-                    .file_manager
-                    .record_interaction(start_time, &request, resp)
-                    .await
-                {
-                    eprintln!("Warning: Failed to record thread interaction: {e}");
-                }
-            }
+        if self.is_thread_enabled()
+            && let Ok(ref resp) = response
+            && let Err(e) = self
+                .file_manager
+                .record_interaction(start_time, &request, resp)
+                .await
+        {
+            eprintln!("Warning: Failed to record thread interaction: {e}");
         }
 
         response

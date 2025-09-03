@@ -1,4 +1,4 @@
-use crate::{provider::AiProviderType, AiConfig};
+use crate::{AiConfig, provider::AiProviderType};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]

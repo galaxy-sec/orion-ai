@@ -306,7 +306,7 @@ mod helper_tests {
         let error = result.unwrap_err();
         assert_eq!(
             error.to_string(),
-            "[800] BUG :logic error << \"TODO: no choices in response\""
+            "[800] BUG :logic error << TODO: no choices in response"
         );
     }
 
@@ -381,7 +381,7 @@ mod helper_tests {
         let error = result.unwrap_err();
         assert_eq!(
             error.to_string(),
-            "[800] BUG :logic error << \"TODO: no choices in response\""
+            "[800] BUG :logic error << TODO: no choices in response"
         );
     }
 
@@ -747,31 +747,6 @@ mod helper_tests {
         let response = result.unwrap();
         assert!(response.tool_calls.is_some());
         assert_eq!(response.tool_calls.as_ref().unwrap().len(), 0);
-    }
-
-    // 辅助函数：创建带有空函数调用的响应JSON
-    fn create_openai_response_with_empty_tool_calls_json() -> String {
-        r#"
-{
-    "choices": [
-        {
-            "message": {
-                "role": "assistant",
-                "content": "这是一个测试响应",
-                "tool_calls": []
-            },
-            "finish_reason": "tool_calls"
-        }
-    ],
-    "usage": {
-        "prompt_tokens": 100,
-        "completion_tokens": 50,
-        "total_tokens": 150
-    },
-    "model": "deepseek-chat"
-}
-"#
-        .to_string()
     }
 }
 

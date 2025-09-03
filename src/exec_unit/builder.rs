@@ -7,21 +7,6 @@ use crate::{
     func::registry::FunctionRegistry,
 };
 
-/// AI执行单元构建器
-///
-/// 提供流式接口来创建和配置 AiExecUnit 实例。
-///
-/// # 示例
-///
-/// ```rust
-/// use orion_ai::{AiExecUnitBuilder, AiConfig};
-///
-/// let exec_unit = AiExecUnitBuilder::new()
-///     .with_config(AiConfig::example())
-///     .with_role("developer")
-///     .with_tools(vec!["git-status".to_string()])
-///     .build()?;
-/// ```
 #[derive(Clone, Debug, Default)]
 pub struct AiExecUnitBuilder {
     dict: EnvDict,

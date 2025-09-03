@@ -1,5 +1,5 @@
 use once_cell::sync::OnceCell;
-use orion_infra::logging::{configure_logging, LogConf};
+use orion_infra::logging::{LogConf, configure_logging};
 
 /*
 pub fn configure_run_logging(_log_conf: Option<String>, debug: usize) {
