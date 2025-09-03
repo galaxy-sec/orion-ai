@@ -1,0 +1,81 @@
+providers:
+  DeepSeek:
+    enabled: true
+    api_key: ${SEC_DEEPSEEK_API_KEY}
+    base_url: https://api.deepseek.com/v1
+    timeout: 30
+    model_aliases: null
+    priority: 2
+  Glm:
+    enabled: true
+    api_key: ${SEC_GLM_API_KEY}
+    base_url: https://open.bigmodel.cn/api/paas/v4
+    timeout: 30
+    model_aliases: null
+    priority: 3
+  OpenAi:
+    enabled: true
+    api_key: ${SEC_OPENAI_API_KEY}
+    base_url: https://api.openai.com/v1
+    timeout: 30
+    model_aliases: null
+    priority: 1
+  Kimi:
+    enabled: true
+    api_key: ${SEC_KIMI_API_KEY}
+    base_url: https://api.moonshot.cn/v1
+    timeout: 30
+    model_aliases: null
+    priority: 4
+routing:
+  simple: gpt-4o-mini
+  complex: gpt-4o
+  free: deepseek-chat
+limits:
+  review_budget: 2000
+  analysis_budget: 4000
+thread:
+  enabled: false
+  storage_path: ./threads
+  filename_template: thread-YYYY-MM-DD.md
+  min_summary_length: 200
+  max_summary_length: 250
+  summary_keywords:
+  - 总结
+  - 总之
+  - 综上所述
+  - 总的来说
+  - 结论
+  - 概要
+  - 摘要
+  - 最终
+  - 归纳起来
+  - 简而言之
+  - 简单来说
+  - 总体而言
+  - 整体来看
+  - 整体而言
+  - 从整体上
+  - 总体来说
+  - 大体而言
+  - 大体来说
+  - 基本上
+  - 基本而言
+  - summary
+  - conclusion
+  - in summary
+  - to summarize
+  - in conclusion
+  - to conclude
+  - overall
+  - in short
+  - briefly
+  - in brief
+  - essentially
+  - basically
+  - ultimately
+  - finally
+  - in essence
+  - to sum up
+  inform_ai: false
+  inform_message: 【Thread记录已启用】本次对话正在被记录，请确保回答内容适合记录和分析。
