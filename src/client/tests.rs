@@ -78,7 +78,7 @@ async fn test_client_with_deepseek() {
 }
 
 #[tokio::test]
-async fn test_client_smart_request_with_deepseek() {
+async fn test_client_smart_request() {
     once_init_log();
     let config = if let Ok(dict) = load_sec_dict() {
         AiConfig::example().env_eval(&dict)
@@ -99,11 +99,11 @@ async fn test_client_smart_request_with_deepseek() {
 
     match response {
         Ok(resp) => {
-            println!("✅ DeepSeek smart 响应: {}", resp.content);
+            println!("✅ AI smart 响应: {}", resp.content);
             assert!(!resp.content.is_empty());
         }
         Err(e) => {
-            println!("⚠️ DeepSeek smart 请求失败（预期）: {e}");
+            println!("⚠️ AI smart 请求失败（预期）: {e}");
         }
     }
 }

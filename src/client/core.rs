@@ -26,7 +26,7 @@ pub struct AiClient {
 #[async_trait]
 impl AiClientTrait for AiClient {
     async fn send_request(&self, request: AiRequest) -> AiResult<AiResponse> {
-        let mut ctx = OperationContext::want("send_request")
+        let mut ctx = OperationContext::want("client send_request")
             .with_auto_log()
             .with_mod_path("ai/client");
 
@@ -35,16 +35,16 @@ impl AiClientTrait for AiClient {
         ctx.record("provider", provider_type.to_string());
 
         let response = if let Some(provider) = self.providers.get(&provider_type) {
-            provider.send_request(&request).await.with(&ctx)
+            provider.send_request(&request).await.with(&ctx)?
         } else {
             for key in self.providers().keys() {
                 error!("registed provider: {key}");
             }
-            Err(OrionAiReason::from(AiErrReason::NoProviderAvailable).to_err())
-                .with(provider_type.to_string())
+            return Err(OrionAiReason::from(AiErrReason::NoProviderAvailable).to_err())
+                .with(provider_type.to_string());
         };
         ctx.mark_suc();
-        response
+        Ok(response)
     }
 
     /// 基于角色的智能请求处理 - 用户只需选择角色，系统自动选择推荐模型
