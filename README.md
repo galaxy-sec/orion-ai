@@ -5,7 +5,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust Version](https://img.shields.io/badge/rust-1.75%2B-orange.svg)](https://rust-lang.org)
 
-> 🌟 用 Rust 构建的智能 AI 执行引擎，打通人类意图与系统操作的最后一公里
 
 ## 🌟 核心特性
 

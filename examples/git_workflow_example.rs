@@ -13,8 +13,10 @@ async fn main() -> orion_ai::AiResult<()> {
     GlobalFunctionRegistry::initialize().assert();
 
     let _case_work_path = ensure_path(PathBuf::from("./examples/git_case")).owe_res()?;
+    let ai_builder = AiExecUnitBuilder::new(load_sec_dict().err_conv()?);
 
-    let ai_exec = AiExecUnitBuilder::new(load_sec_dict().err_conv()?)
+    let ai_exec = ai_builder
+        .clone()
         .with_role("developer")
         .with_tools(vec!["git-status".to_string()])
         .build()
@@ -40,6 +42,26 @@ async fn main() -> orion_ai::AiResult<()> {
             eprintln!("❌ {}", response.content);
         }
     }
+    let ai_exec = ai_builder
+        .clone()
+        .with_role("developer")
+        //.with_tools(vec!["git-status".to_string()])
+        .build()
+        .err_conv()
+        .want("create ai exec unit")?;
+    let response = ai_exec.execute_with_func("给出当前的所在目录").await?;
+    match response.status {
+        ExecutionStatus::Success => {
+            println!("✅  {} ", response.content);
+            for call in response.tool_calls {
+                println!("✅  {:#} ", call.result);
+            }
+        }
+        _ => {
+            eprintln!("❌ {}", response.content);
+        }
+    }
+
     /*
 
     // 7. 场景2: 添加修改的文件
