@@ -1,6 +1,13 @@
 use std::sync::{Arc, OnceLock, RwLock};
 
-use crate::{FunctionExecutor, func::registry::FunctionRegistry};
+use orion_error::{ToStructError, UvsValidationFrom};
+
+use crate::{
+    AiResult, FunctionExecutor,
+    error::OrionAiReason,
+    func::registry::FunctionRegistry,
+    provider::{FunctionCall, FunctionDefinition, FunctionResult},
+};
 
 /// 全局函数注册表管理器
 pub struct GlobalFunctionRegistry {
@@ -18,7 +25,7 @@ impl GlobalFunctionRegistry {
     }
 
     /// 初始化并注册所有工具（应用启动时调用）
-    pub fn initialize() -> Result<(), orion_error::UvsReason> {
+    pub fn initialize() -> AiResult<()> {
         let instance = Self::instance();
 
         // 如果尚未初始化，则创建新注册表
@@ -33,14 +40,15 @@ impl GlobalFunctionRegistry {
         if let Some(registry_arc) = instance.global_registry.get() {
             let registry_guard = registry_arc.read().unwrap();
             if registry_guard.is_none() {
-                return Err(orion_error::UvsReason::validation_error(
-                    "Registry initialization failed",
-                ));
+                return Err(
+                    OrionAiReason::from_validation("Registry initialization failed").to_err(),
+                );
             }
         } else {
-            return Err(orion_error::UvsReason::validation_error(
+            return Err(OrionAiReason::from_validation(
                 "Global function registry not initialized. Call initialize() first.",
-            ));
+            )
+            .into());
         }
 
         Ok(())
@@ -62,7 +70,7 @@ impl GlobalFunctionRegistry {
     }
 
     /// 创建注册表并注册所有工具（硬编码）
-    fn create_and_register_tools() -> Result<FunctionRegistry, orion_error::UvsReason> {
+    fn create_and_register_tools() -> AiResult<FunctionRegistry> {
         let mut registry = FunctionRegistry::new();
 
         // 硬编码注册 Git 工具
@@ -81,135 +89,80 @@ impl GlobalFunctionRegistry {
     }
 
     /// 显式注册 Git 工具
-    fn register_git_tools(registry: &mut FunctionRegistry) -> Result<(), orion_error::UvsReason> {
+    fn register_git_tools(registry: &mut FunctionRegistry) -> AiResult<()> {
         use crate::func::git::{GitFunctionExecutor, create_git_functions};
         use std::sync::Arc;
 
         // 注册函数定义
         let git_functions = create_git_functions();
         for function in git_functions {
-            registry.register_function(function).map_err(|e| {
-                orion_error::UvsReason::validation_error(format!(
-                    "Failed to register git function: {}",
-                    e
-                ))
-            })?;
+            registry.register_function(function)?;
         }
 
         // 注册执行器
         let git_executor = Arc::new(GitFunctionExecutor);
         for function_name in git_executor.supported_functions() {
-            registry
-                .register_executor(function_name, git_executor.clone())
-                .map_err(|e| {
-                    orion_error::UvsReason::validation_error(format!(
-                        "Failed to register git executor: {}",
-                        e
-                    ))
-                })?;
+            registry.register_executor(function_name, git_executor.clone())?;
         }
 
         Ok(())
     }
 
     /// 注册文件系统工具
-    fn register_filesystem_tools(
-        registry: &mut FunctionRegistry,
-    ) -> Result<(), orion_error::UvsReason> {
+    fn register_filesystem_tools(registry: &mut FunctionRegistry) -> AiResult<()> {
         use crate::func::system::{FileSystemExecutor, create_fs_functions};
         use std::sync::Arc;
 
         let fs_functions = create_fs_functions();
         for function in fs_functions {
-            registry.register_function(function).map_err(|e| {
-                orion_error::UvsReason::validation_error(format!(
-                    "Failed to register filesystem function: {}",
-                    e
-                ))
-            })?;
+            registry.register_function(function)?;
         }
 
         let fs_executor = Arc::new(FileSystemExecutor);
         for function_name in fs_executor.supported_functions() {
-            registry
-                .register_executor(function_name, fs_executor.clone())
-                .map_err(|e| {
-                    orion_error::UvsReason::validation_error(format!(
-                        "Failed to register filesystem executor: {}",
-                        e
-                    ))
-                })?;
+            registry.register_executor(function_name, fs_executor.clone())?;
         }
 
         Ok(())
     }
 
     /// 注册系统信息工具
-    fn register_system_info_tools(
-        registry: &mut FunctionRegistry,
-    ) -> Result<(), orion_error::UvsReason> {
+    fn register_system_info_tools(registry: &mut FunctionRegistry) -> AiResult<()> {
         use crate::func::system::{SystemInfoExecutor, create_sys_functions};
         use std::sync::Arc;
 
         let sys_functions = create_sys_functions();
         for function in sys_functions {
-            registry.register_function(function).map_err(|e| {
-                orion_error::UvsReason::validation_error(format!(
-                    "Failed to register system info function: {}",
-                    e
-                ))
-            })?;
+            registry.register_function(function)?;
         }
 
         let sys_executor = Arc::new(SystemInfoExecutor);
         for function_name in sys_executor.supported_functions() {
-            registry
-                .register_executor(function_name, sys_executor.clone())
-                .map_err(|e| {
-                    orion_error::UvsReason::validation_error(format!(
-                        "Failed to register system info executor: {}",
-                        e
-                    ))
-                })?;
+            registry.register_executor(function_name, sys_executor.clone())?;
         }
-
         Ok(())
     }
 
     /// 注册网络工具
-    fn register_network_tools(
-        registry: &mut FunctionRegistry,
-    ) -> Result<(), orion_error::UvsReason> {
+    fn register_network_tools(registry: &mut FunctionRegistry) -> AiResult<()> {
         use crate::func::system::{NetworkExecutor, create_net_functions};
         use std::sync::Arc;
 
         let net_functions = create_net_functions();
         for function in net_functions {
-            registry.register_function(function).map_err(|e| {
-                orion_error::UvsReason::validation_error(format!(
-                    "Failed to register network function: {}",
-                    e
-                ))
-            })?;
+            registry.register_function(function)?;
         }
 
         let net_executor = Arc::new(NetworkExecutor);
         for function_name in net_executor.supported_functions() {
-            registry
-                .register_executor(function_name, net_executor.clone())
-                .map_err(|e| {
-                    orion_error::UvsReason::validation_error(format!(
-                        "Failed to register network executor: {}",
-                        e
-                    ))
-                })?;
+            registry.register_executor(function_name, net_executor.clone())?;
         }
 
         Ok(())
     }
 
     /// 获取注册表的克隆副本（避免锁竞争）
-    pub fn get_registry() -> Result<FunctionRegistry, orion_error::UvsReason> {
+    pub fn get_registry() -> AiResult<FunctionRegistry> {
         // 确保注册表已初始化（自动初始化）
         let instance = Self::instance();
 
@@ -217,22 +170,22 @@ impl GlobalFunctionRegistry {
             let registry_guard = registry_arc.read().unwrap();
             match registry_guard.as_ref() {
                 Some(registry) => Ok(registry.clone_registry()),
-                None => Err(orion_error::UvsReason::validation_error(
+                None => Err(OrionAiReason::from_validation(
                     "Global function registry not initialized. Call initialize() first.",
-                )),
+                )
+                .to_err()),
             }
         } else {
             // 注册表从未初始化
-            Err(orion_error::UvsReason::validation_error(
+            Err(OrionAiReason::from_validation(
                 "Global function registry not initialized. Call initialize() first.",
-            ))
+            )
+            .to_err())
         }
     }
 
     /// 🎯 获取注册表的克隆副本，并根据指定工具列表进行过滤
-    pub fn get_registry_with_tools(
-        tools: &[String],
-    ) -> Result<FunctionRegistry, orion_error::UvsReason> {
+    pub fn get_registry_with_tools(tools: &[String]) -> AiResult<FunctionRegistry> {
         // 首先获取完整的注册表副本
         let full_registry = Self::get_registry()?;
 
@@ -252,31 +205,203 @@ impl GlobalFunctionRegistry {
         // 创建新的注册表并只包含过滤后的函数
         let mut filtered_registry = FunctionRegistry::new();
         for function_def in filtered_functions {
-            filtered_registry
-                .register_function(function_def)
-                .map_err(|e| {
-                    orion_error::UvsReason::validation_error(format!(
-                        "Failed to register filtered function: {}",
-                        e
-                    ))
-                })?;
+            filtered_registry.register_function(function_def)?;
         }
 
         // 复制执行器引用
         for tool_name in tools {
             if let Some(executor) = full_registry.get_executor(tool_name) {
-                filtered_registry
-                    .register_executor(tool_name.clone(), executor)
-                    .map_err(|e| {
-                        orion_error::UvsReason::validation_error(format!(
-                            "Failed to register executor for {}: {}",
-                            tool_name, e
-                        ))
-                    })?;
+                filtered_registry.register_executor(tool_name.clone(), executor)?;
             }
         }
 
         Ok(filtered_registry)
+    }
+
+    /// 执行函数调用
+    pub async fn execute_function(&self, function_call: &FunctionCall) -> AiResult<FunctionResult> {
+        match Self::get_registry() {
+            Ok(registry) => registry.execute_function(function_call).await,
+            Err(e) => Err(e),
+        }
+    }
+
+    /// 获取函数注册表的克隆副本
+    pub fn clone_functions(&self) -> Vec<FunctionDefinition> {
+        match Self::get_registry() {
+            Ok(registry) => registry.get_functions().into_iter().cloned().collect(),
+            Err(_) => Vec::new(),
+        }
+    }
+
+    /// 确保注册表已初始化的辅助方法
+    fn ensure_initialized() -> AiResult<()> {
+        let instance = Self::instance();
+
+        // 如果尚未初始化，自动初始化
+        if instance.global_registry.get().is_none() {
+            Self::initialize()?;
+        }
+
+        // 验证已注册
+        if let Some(registry_arc) = instance.global_registry.get() {
+            let registry_guard = registry_arc.read().unwrap();
+            if registry_guard.is_none() {
+                return Err(OrionAiReason::Uvs(orion_error::UvsReason::validation_error(
+                    "Registry initialization failed",
+                ))
+                .into());
+            }
+        } else {
+            return Err(OrionAiReason::Uvs(orion_error::UvsReason::validation_error(
+                "Global function registry not initialized",
+            ))
+            .into());
+        }
+
+        Ok(())
+    }
+
+    /// 动态注册单个函数定义
+    pub fn register_function(function: FunctionDefinition) -> AiResult<()> {
+        // 确保注册表已初始化
+        Self::ensure_initialized()?;
+
+        // 检查函数名是否已存在
+        let instance = Self::instance();
+        if let Some(registry_arc) = instance.global_registry.get() {
+            let registry = registry_arc.read().unwrap();
+            if let Some(ref reg) = *registry {
+                if reg.contains_function(&function.name) {
+                    return Err(OrionAiReason::Uvs(orion_error::UvsReason::validation_error(
+                        format!("Function '{}' already registered", function.name),
+                    ))
+                    .into());
+                }
+            }
+        }
+
+        // 获取注册表并注册函数
+        let instance = Self::instance();
+        if let Some(registry_arc) = instance.global_registry.get() {
+            let mut registry = registry_arc.write().unwrap();
+            if let Some(ref mut reg) = *registry {
+                reg.register_function(function)?;
+                return Ok(());
+            }
+        }
+
+        Err(OrionAiReason::Uvs(orion_error::UvsReason::validation_error(
+            "Registry not available for function registration",
+        ))
+        .into())
+    }
+
+    /// 动态注册执行器
+    pub fn register_executor(
+        function_name: String,
+        executor: Arc<dyn FunctionExecutor>,
+    ) -> AiResult<()> {
+        Self::ensure_initialized()?;
+
+        // 验证执行器支持该函数
+        if !executor.supported_functions().contains(&function_name) {
+            return Err(
+                OrionAiReason::Uvs(orion_error::UvsReason::validation_error(format!(
+                    "Executor does not support function '{}'",
+                    function_name
+                )))
+                .into(),
+            );
+        }
+
+        let instance = Self::instance();
+        if let Some(registry_arc) = instance.global_registry.get() {
+            let mut registry = registry_arc.write().unwrap();
+            if let Some(ref mut reg) = *registry {
+                reg.register_executor(function_name, executor)?;
+                return Ok(());
+            }
+        }
+
+        Err(OrionAiReason::Uvs(orion_error::UvsReason::validation_error(
+            "Registry not available for executor registration",
+        ))
+        .into())
+    }
+
+    /// 批量注册工具集（函数定义 + 执行器）
+    pub fn register_tool_set(
+        functions: Vec<FunctionDefinition>,
+        executor: Arc<dyn FunctionExecutor>,
+    ) -> AiResult<()> {
+        Self::ensure_initialized()?;
+
+        // 验证执行器支持所有函数
+        let supported_functions = executor.supported_functions();
+        // 先检查所有函数名是否冲突
+        for function in &functions {
+            if !supported_functions.contains(&function.name) {
+                return Err(
+                    OrionAiReason::Uvs(orion_error::UvsReason::validation_error(format!(
+                        "Executor does not support function '{}'",
+                        function.name
+                    )))
+                    .into(),
+                );
+            }
+        }
+
+        // 一次性获取写锁，避免多次锁操作
+        let instance = Self::instance();
+        if let Some(registry_arc) = instance.global_registry.get() {
+            let mut registry = registry_arc.write().unwrap();
+            if let Some(ref mut reg) = *registry {
+                // 批量注册函数定义
+                for function in functions {
+                    // 检查函数名是否已存在
+                    if reg.contains_function(&function.name) {
+                        return Err(OrionAiReason::Uvs(orion_error::UvsReason::validation_error(
+                            format!("Function '{}' already registered", function.name),
+                        ))
+                        .into());
+                    }
+                    reg.register_function(function)?;
+                }
+
+                // 批量注册执行器
+                for function_name in &executor.supported_functions() {
+                    reg.register_executor(function_name.clone(), executor.clone())?;
+                }
+
+                return Ok(());
+            }
+        }
+
+        Err(OrionAiReason::Uvs(orion_error::UvsReason::validation_error(
+            "Registry not available for tool set registration",
+        ))
+        .into())
+    }
+
+    /// 移除指定函数
+    pub fn unregister_function(function_name: &str) -> AiResult<()> {
+        Self::ensure_initialized()?;
+
+        let instance = Self::instance();
+        if let Some(registry_arc) = instance.global_registry.get() {
+            let mut registry = registry_arc.write().unwrap();
+            if let Some(ref mut reg) = *registry {
+                // 使用公共方法移除函数
+                reg.unregister_function(function_name);
+                return Ok(());
+            }
+        }
+
+        Err(OrionAiReason::Uvs(orion_error::UvsReason::validation_error(
+            "Registry not available for function unregistration",
+        ))
+        .into())
     }
 }
 
@@ -404,5 +529,227 @@ mod global_registry_tests {
         // 注册表应该仍然可用
         let registry = GlobalFunctionRegistry::get_registry();
         assert!(registry.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_dynamic_function_registration() {
+        // 重置注册表以确保干净的测试环境
+        GlobalFunctionRegistry::reset();
+
+        // 初始化
+        assert!(GlobalFunctionRegistry::initialize().is_ok());
+
+        // 创建自定义函数
+        let custom_function = FunctionDefinition {
+            name: "test-custom-function".to_string(),
+            description: "Test custom function".to_string(),
+            parameters: vec![],
+        };
+
+        // 注册函数
+        assert!(GlobalFunctionRegistry::register_function(custom_function.clone()).is_ok());
+
+        // 验证注册成功
+        let registry = GlobalFunctionRegistry::get_registry().unwrap();
+        assert!(registry.contains_function("test-custom-function"));
+
+        // 测试重复注册应该失败
+        assert!(GlobalFunctionRegistry::register_function(custom_function).is_err());
+    }
+
+    #[tokio::test]
+    async fn test_dynamic_executor_registration() {
+        GlobalFunctionRegistry::reset();
+        assert!(GlobalFunctionRegistry::initialize().is_ok());
+
+        struct TestExecutor;
+
+        #[async_trait::async_trait]
+        impl FunctionExecutor for TestExecutor {
+            async fn execute(&self, function_call: &FunctionCall) -> AiResult<FunctionResult> {
+                Ok(FunctionResult {
+                    name: function_call.function.name.clone(),
+                    result: serde_json::json!({"test": "result"}),
+                    error: None,
+                })
+            }
+
+            fn supported_functions(&self) -> Vec<String> {
+                vec!["test-function".to_string()]
+            }
+
+            fn get_function_schema(&self, function_name: &str) -> Option<FunctionDefinition> {
+                if function_name == "test-function" {
+                    Some(FunctionDefinition {
+                        name: "test-function".to_string(),
+                        description: "Test function".to_string(),
+                        parameters: vec![],
+                    })
+                } else {
+                    None
+                }
+            }
+        }
+
+        let executor = Arc::new(TestExecutor);
+
+        // 测试注册不支持的函数应该失败
+        assert!(
+            GlobalFunctionRegistry::register_executor(
+                "unsupported-function".to_string(),
+                executor.clone()
+            )
+            .is_err()
+        );
+
+        // 测试注册支持的函数
+        assert!(
+            GlobalFunctionRegistry::register_executor("test-function".to_string(), executor)
+                .is_ok()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_tool_set_registration() {
+        GlobalFunctionRegistry::reset();
+        assert!(GlobalFunctionRegistry::initialize().is_ok());
+
+        struct TestSetExecutor;
+
+        #[async_trait::async_trait]
+        impl FunctionExecutor for TestSetExecutor {
+            async fn execute(&self, function_call: &FunctionCall) -> AiResult<FunctionResult> {
+                Ok(FunctionResult {
+                    name: function_call.function.name.clone(),
+                    result: serde_json::json!({"test": "set_result"}),
+                    error: None,
+                })
+            }
+
+            fn supported_functions(&self) -> Vec<String> {
+                vec!["set-function-1".to_string(), "set-function-2".to_string()]
+            }
+
+            fn get_function_schema(&self, function_name: &str) -> Option<FunctionDefinition> {
+                match function_name {
+                    "set-function-1" => Some(FunctionDefinition {
+                        name: "set-function-1".to_string(),
+                        description: "Test set function 1".to_string(),
+                        parameters: vec![],
+                    }),
+                    "set-function-2" => Some(FunctionDefinition {
+                        name: "set-function-2".to_string(),
+                        description: "Test set function 2".to_string(),
+                        parameters: vec![],
+                    }),
+                    _ => None,
+                }
+            }
+        }
+
+        let functions = vec![
+            FunctionDefinition {
+                name: "set-function-1".to_string(),
+                description: "Test set function 1".to_string(),
+                parameters: vec![],
+            },
+            FunctionDefinition {
+                name: "set-function-2".to_string(),
+                description: "Test set function 2".to_string(),
+                parameters: vec![],
+            },
+        ];
+
+        let executor = Arc::new(TestSetExecutor);
+
+        // 测试工具集注册
+        assert!(GlobalFunctionRegistry::register_tool_set(functions, executor).is_ok());
+
+        // 验证所有函数都已注册
+        let registry = GlobalFunctionRegistry::get_registry().unwrap();
+        assert!(registry.contains_function("set-function-1"));
+        assert!(registry.contains_function("set-function-2"));
+    }
+
+    #[tokio::test]
+    async fn test_function_unregistration() {
+        GlobalFunctionRegistry::reset();
+        assert!(GlobalFunctionRegistry::initialize().is_ok());
+
+        // 注册一个测试函数
+        let test_function = FunctionDefinition {
+            name: "test-unregister".to_string(),
+            description: "Test function for unregistration".to_string(),
+            parameters: vec![],
+        };
+
+        struct TestUnregisterExecutor;
+
+        #[async_trait::async_trait]
+        impl FunctionExecutor for TestUnregisterExecutor {
+            async fn execute(&self, function_call: &FunctionCall) -> AiResult<FunctionResult> {
+                Ok(FunctionResult {
+                    name: function_call.function.name.clone(),
+                    result: serde_json::json!({}),
+                    error: None,
+                })
+            }
+
+            fn supported_functions(&self) -> Vec<String> {
+                vec!["test-unregister".to_string()]
+            }
+
+            fn get_function_schema(&self, function_name: &str) -> Option<FunctionDefinition> {
+                if function_name == "test-unregister" {
+                    Some(FunctionDefinition {
+                        name: "test-unregister".to_string(),
+                        description: "Test function".to_string(),
+                        parameters: vec![],
+                    })
+                } else {
+                    None
+                }
+            }
+        }
+
+        let executor = Arc::new(TestUnregisterExecutor);
+
+        // 注册函数和执行器
+        assert!(GlobalFunctionRegistry::register_function(test_function.clone()).is_ok());
+        assert!(
+            GlobalFunctionRegistry::register_executor("test-unregister".to_string(), executor)
+                .is_ok()
+        );
+
+        // 验证注册成功
+        let registry = GlobalFunctionRegistry::get_registry().unwrap();
+        assert!(registry.contains_function("test-unregister"));
+
+        // 注销函数
+        assert!(GlobalFunctionRegistry::unregister_function("test-unregister").is_ok());
+
+        // 验证注销成功
+        let registry = GlobalFunctionRegistry::get_registry().unwrap();
+        assert!(!registry.contains_function("test-unregister"));
+    }
+
+    #[tokio::test]
+    async fn test_ensure_initialized() {
+        // 重置注册表
+        GlobalFunctionRegistry::reset();
+
+        // 注册应该自动初始化
+        let test_function = FunctionDefinition {
+            name: "auto-init-function".to_string(),
+            description: "Auto init test function".to_string(),
+            parameters: vec![],
+        };
+
+        // 注册函数（应该自动初始化）
+        assert!(GlobalFunctionRegistry::register_function(test_function).is_ok());
+
+        // 验证注册成功
+        let registry = GlobalFunctionRegistry::get_registry().unwrap();
+        assert!(registry.contains_function("auto-init-function"));
     }
 }

@@ -66,9 +66,47 @@ impl FunctionRegistry {
         self.executors.contains_key(function_name)
     }
 
+    /// 检查函数是否已存在
+    pub fn contains_function(&self, name: &str) -> bool {
+        self.functions.contains_key(name)
+    }
+
     /// 获取所有支持的函数名称
     pub fn get_supported_function_names(&self) -> Vec<String> {
         self.executors.keys().cloned().collect()
+    }
+
+    /// 批量注册函数定义（优化版本）
+    pub fn register_functions_batch(&mut self, functions: Vec<FunctionDefinition>) -> AiResult<()> {
+        // 先检查所有函数名是否冲突
+        for function in &functions {
+            if self.functions.contains_key(&function.name) {
+                return Err(OrionAiReason::from_logic(format!(
+                    "Function '{}' already registered",
+                    function.name
+                ))
+                .to_err());
+            }
+        }
+
+        // 批量注册
+        for function in functions {
+            self.functions.insert(function.name.clone(), function);
+        }
+
+        Ok(())
+    }
+
+    /// 获取所有注册的函数名称
+    pub fn get_function_names(&self) -> Vec<String> {
+        self.functions.keys().cloned().collect()
+    }
+
+    /// 移除指定函数及其执行器
+    pub fn unregister_function(&mut self, function_name: &str) -> bool {
+        let function_removed = self.functions.remove(function_name).is_some();
+        let executor_removed = self.executors.remove(function_name).is_some();
+        function_removed || executor_removed
     }
 
     /// 批量注册函数

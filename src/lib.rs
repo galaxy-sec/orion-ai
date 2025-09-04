@@ -23,6 +23,9 @@ pub use func::global::GlobalFunctionRegistry;
 pub use func::{executor::FunctionExecutor, registry::FunctionRegistry};
 pub use provider::{FunctionCall, FunctionDefinition, FunctionParameter, FunctionResult};
 
+// 添加方便的重新导出
+// 移除重复的别名导入，避免冲突
+
 // 客户端相关导出
 pub use client::{AiClient, AiClientTrait, AiCoreClient};
 pub use error::{AiErrReason, AiError, AiResult};

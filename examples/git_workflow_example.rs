@@ -1,3 +1,4 @@
+use std::env::{current_dir, home_dir, set_current_dir};
 use std::path::PathBuf;
 
 use orion_ai::types::ExecutionStatus;
@@ -11,8 +12,10 @@ use orion_sec::load_sec_dict;
 async fn main() -> orion_ai::AiResult<()> {
     env_logger::init();
     GlobalFunctionRegistry::initialize().assert();
+    let home = home_dir().assert();
 
-    let _case_work_path = ensure_path(PathBuf::from("./examples/git_case")).owe_res()?;
+    let case_work_path = ensure_path(home.join("ai-case/git-case")).owe_res()?;
+    set_current_dir(case_work_path).owe_res()?;
     let ai_builder = AiExecUnitBuilder::new(load_sec_dict().err_conv()?);
 
     let ai_exec = ai_builder
