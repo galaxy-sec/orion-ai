@@ -1,5 +1,5 @@
 [package]
-name = "orion_ai"
+name = "orion-ai"
 version = "0.1.0"
 authors = ["wukong<sec-wukong@outlook.com>"]
 edition = "2024"
