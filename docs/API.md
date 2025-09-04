@@ -9,14 +9,11 @@ use orion_ai::*;
 async fn main() -> AiResult<()> {
     // 1. 初始化注册表
     GlobalFunctionRegistry::initialize()?;
-    
-    // 2. 选择工具集
-    let tools = vec!["git-status", "fs-ls"];
-    
-    // 3. 创建执行单元
+
+    // 2. 创建执行单元
     let ai = AiExecUnitBuilder::new(load_config()?).build();
-    
-    // 4. 执行智能请求
+
+    // 3. 执行智能请求
     let response = ai.smart_request("检查这个仓库状态").await?;
     println!("AI响应: {}", response);
     Ok(())
@@ -122,7 +119,7 @@ GlobalFunctionRegistry::register_tool_set(functions, executor)?;
 pub fn register_my_extension() -> AiResult<()> {
     let functions = create_my_functions();
     let executor = Arc::new(MyExtensionExecutor::new());
-    
+
     GlobalFunctionRegistry::register_tool_set(functions, executor)
 }
 ```

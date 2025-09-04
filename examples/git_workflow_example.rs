@@ -1,5 +1,4 @@
-use std::env::{current_dir, home_dir, set_current_dir};
-use std::path::PathBuf;
+use std::env::{home_dir, set_current_dir};
 
 use orion_ai::types::ExecutionStatus;
 use orion_ai::{AiExecUnitBuilder, GlobalFunctionRegistry};
