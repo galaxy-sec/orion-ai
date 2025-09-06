@@ -12,7 +12,7 @@ orion-error = "~0.5"
 orion_conf = "~0.1"
 orion_infra = { git = "https://github.com/galaxy-sec/orion-infra.git", tag = "v0.3.1" }
 orion_variate = { git = "https://github.com/galaxy-sec/orion-variate.git", tag = "v0.9.1" }
-orion-sec = { git = "https://github.com/galaxy-sec/orion-sec.git", branch = "main" }
+orion-sec = { git = "https://github.com/galaxy-sec/orion-sec.git", tag= "v0.1.1" }
 
 getset = "0.1.6"
 fs_extra = "1.3"

@@ -1311,7 +1311,7 @@ dependencies = [
  "orion-sec",
  "orion_conf 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "orion_infra 0.3.1",
- "orion_variate 0.9.1",
+ "orion_variate",
  "reqwest",
  "rstest",
  "scopeguard",
@@ -1359,8 +1359,8 @@ dependencies = [
 
 [[package]]
 name = "orion-sec"
-version = "0.1.0"
-source = "git+https://github.com/galaxy-sec/orion-sec.git?branch=main#6590f54ae7e956e106cb26b316d654d86c478647"
+version = "0.1.1"
+source = "git+https://github.com/galaxy-sec/orion-sec.git?tag=v0.1.1#32b8d099b2fc4a1ce3c8a08626d2b9970ec63061"
 dependencies = [
  "chrono",
  "contracts",
@@ -1372,7 +1372,7 @@ dependencies = [
  "once_cell",
  "orion-error 0.5.4",
  "orion_conf 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "orion_variate 0.9.0",
+ "orion_variate",
  "serde",
  "serde_derive",
  "serde_yaml",
@@ -1452,53 +1452,6 @@ dependencies = [
  "serde_yaml",
  "thiserror",
  "toml",
-]
-
-[[package]]
-name = "orion_variate"
-version = "0.9.0"
-source = "git+https://github.com/galaxy-sec/orion-variate.git?tag=v0.9.0#c3e7b1b5ac37c2687745b1b5b7ee1290288a571b"
-dependencies = [
- "anyhow",
- "async-trait",
- "bytes",
- "contracts",
- "derive-getters",
- "derive_more",
- "env_logger",
- "flate2",
- "flexi_logger",
- "fs_extra",
- "futures-core",
- "getset",
- "git2",
- "home",
- "http",
- "http-body",
- "indexmap",
- "indicatif",
- "log",
- "orion-error 0.5.4",
- "orion_conf 0.1.5 (git+https://github.com/galaxy-sec/orion-conf.git?tag=v0.1.5)",
- "orion_infra 0.3.2",
- "os_info",
- "reqwest",
- "scopeguard",
- "serde",
- "serde_derive",
- "serde_ini",
- "serde_json",
- "serde_yaml",
- "tar",
- "thiserror",
- "tokio",
- "tokio-util",
- "toml",
- "tracing",
- "url",
- "walkdir",
- "wildmatch",
- "winnow",
 ]
 
 [[package]]

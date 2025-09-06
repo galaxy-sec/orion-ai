@@ -3,7 +3,7 @@ mod  envs {
   env default {
   }
 }
-mod main  : ver_adm {
+mod main  : lib_ver_adm {
   flow setup_depends {
     gx.cmd (  "cargo install cargo-semver --vers 1.0.0-alpha.3" );
   }
