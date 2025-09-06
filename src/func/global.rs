@@ -271,13 +271,16 @@ impl GlobalFunctionRegistry {
         let instance = Self::instance();
         if let Some(registry_arc) = instance.global_registry.get() {
             let registry = registry_arc.read().unwrap();
-            if let Some(ref reg) = *registry {
-                if reg.contains_function(&function.name) {
-                    return Err(OrionAiReason::Uvs(orion_error::UvsReason::validation_error(
-                        format!("Function '{}' already registered", function.name),
-                    ))
-                    .into());
-                }
+            if let Some(ref reg) = *registry
+                && reg.contains_function(&function.name)
+            {
+                return Err(
+                    OrionAiReason::Uvs(orion_error::UvsReason::validation_error(format!(
+                        "Function '{}' already registered",
+                        function.name
+                    )))
+                    .into(),
+                );
             }
         }
 
