@@ -28,7 +28,7 @@ pub use provider::{FunctionCall, FunctionDefinition, FunctionParameter, Function
 
 // 客户端相关导出
 pub use client::{AiClient, AiClientTrait, AiCoreClient};
-pub use error::{AiErrReason, AiError, AiResult};
+pub use error::{AiErrReason, AiError, AiResult, OrionAiReason};
 pub use thread::ThreadConfig;
 pub use thread::recorder::{ThreadClient, ThreadFileManager};
 
