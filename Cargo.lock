@@ -1359,8 +1359,8 @@ dependencies = [
 
 [[package]]
 name = "orion-sec"
-version = "0.1.1"
-source = "git+https://github.com/galaxy-sec/orion-sec.git?tag=v0.1.1#32b8d099b2fc4a1ce3c8a08626d2b9970ec63061"
+version = "0.2.0"
+source = "git+https://github.com/galaxy-sec/orion-sec.git?tag=v0.2.0#9214865a58358ea27d6dba591bf6f48d466be69f"
 dependencies = [
  "chrono",
  "contracts",
