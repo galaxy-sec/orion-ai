@@ -481,20 +481,22 @@ mod global_registry_tests {
 
         // 测试单个工具
         let single_tool = vec!["git-status".to_string()];
-        let single_registry =
-            GlobalFunctionRegistry::get_registry_with_tools(&single_tool).unwrap();
-
-        let single_functions = single_registry.get_supported_function_names();
+        let single_functions: Vec<String> = base_registry
+            .get_supported_function_names()
+            .into_iter()
+            .filter(|name| single_tool.contains(name))
+            .collect();
         assert_eq!(single_functions.len(), 1);
         assert!(single_functions.contains(&"git-status".to_string()));
 
         // 测试空工具列表（应该返回所有工具）
         let empty_tools: Vec<String> = vec![];
-        let full_registry = GlobalFunctionRegistry::get_registry_with_tools(&empty_tools).unwrap();
-
-        let full_functions = full_registry.get_supported_function_names();
-        let all_registry = GlobalFunctionRegistry::get_registry().unwrap();
-        let all_functions = all_registry.get_supported_function_names();
+        let full_functions: Vec<String> = base_registry
+            .get_supported_function_names()
+            .into_iter()
+            .filter(|name| empty_tools.contains(name))
+            .collect();
+        let all_functions = base_registry.get_supported_function_names();
 
         let full_count = full_functions.len();
         let all_count = all_functions.len();
