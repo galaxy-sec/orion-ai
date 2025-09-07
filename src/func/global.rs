@@ -490,12 +490,8 @@ mod global_registry_tests {
         assert!(single_functions.contains(&"git-status".to_string()));
 
         // 测试空工具列表（应该返回所有工具）
-        let empty_tools: Vec<String> = vec![];
-        let full_functions: Vec<String> = base_registry
-            .get_supported_function_names()
-            .into_iter()
-            .filter(|name| empty_tools.contains(name))
-            .collect();
+        let _empty_tools: Vec<String> = vec![];
+        let full_functions = base_registry.get_supported_function_names();
         let all_functions = base_registry.get_supported_function_names();
 
         let full_count = full_functions.len();
