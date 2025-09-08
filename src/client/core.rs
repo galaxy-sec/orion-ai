@@ -50,10 +50,7 @@ impl AiClientTrait for AiClient {
     /// 基于角色的智能请求处理 - 用户只需选择角色，系统自动选择推荐模型
     async fn smart_role_request(&self, role: &AiRoleID, user_input: &str) -> AiResult<AiResponse> {
         let request = self.build_ai_request(role, user_input)?;
-        // 3. 发送请求
         let mut response = self.send_request(request).await?;
-
-        // 4. 在响应中添加角色信息
         response.content = format!("[角色: {}]\n\n{}", role.description(), response.content);
 
         Ok(response)

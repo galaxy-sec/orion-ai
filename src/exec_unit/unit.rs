@@ -43,24 +43,7 @@ impl AiExecUnit {
 
     pub async fn execute(&self, prompt: &str) -> AiResult<ExecutionResult> {
         let response = self.client.smart_role_request(&self.role, prompt).await?;
-
-        // 将 AiResponse 转换为 ExecutionResult
-        let tool_results = if let Some(tool_calls) = &response.tool_calls {
-            tool_calls
-                .iter()
-                .map(|tool_call| {
-                    FunctionResult {
-                        name: tool_call.function.name.clone(),
-                        result: serde_json::Value::Null, // 工具调用结果需要后续处理
-                        error: None,
-                    }
-                })
-                .collect()
-        } else {
-            Vec::new()
-        };
-
-        Ok(ExecutionResult::new(response.content).with_tool_calls(tool_results))
+        Ok(ExecutionResult::new(response.content))
     }
     pub async fn execute_with_func(&self, prompt: &str) -> AiResult<ExecutionResult> {
         let response = self
