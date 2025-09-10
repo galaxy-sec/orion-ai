@@ -134,6 +134,11 @@ impl GlobalFunctionRegistry {
         // 注册网络工具
         Self::register_network_tools(&mut registry)?;
 
+        // 注册诊断工具
+        Self::register_diagnosis_tools(&mut registry)?;
+        Self::register_monitor_tools(&mut registry)?;
+        Self::register_analysis_tools(&mut registry)?;
+
         Ok(registry)
     }
 
@@ -205,6 +210,60 @@ impl GlobalFunctionRegistry {
         let net_executor = Arc::new(NetworkExecutor);
         for function_name in net_executor.supported_functions() {
             registry.register_executor(function_name, net_executor.clone())?;
+        }
+
+        Ok(())
+    }
+
+    /// 注册诊断工具
+    fn register_diagnosis_tools(registry: &mut FunctionRegistry) -> AiResult<()> {
+        use crate::func::system::{DiagnosisExecutor, create_diagnosis_functions};
+        use std::sync::Arc;
+
+        let diagnosis_functions = create_diagnosis_functions();
+        for function in diagnosis_functions {
+            registry.register_function(function)?;
+        }
+
+        let diagnosis_executor = Arc::new(DiagnosisExecutor);
+        for function_name in diagnosis_executor.supported_functions() {
+            registry.register_executor(function_name, diagnosis_executor.clone())?;
+        }
+
+        Ok(())
+    }
+
+    /// 注册监控工具
+    fn register_monitor_tools(registry: &mut FunctionRegistry) -> AiResult<()> {
+        use crate::func::system::{MonitorExecutor, create_monitor_functions};
+        use std::sync::Arc;
+
+        let monitor_functions = create_monitor_functions();
+        for function in monitor_functions {
+            registry.register_function(function)?;
+        }
+
+        let monitor_executor = Arc::new(MonitorExecutor);
+        for function_name in monitor_executor.supported_functions() {
+            registry.register_executor(function_name, monitor_executor.clone())?;
+        }
+
+        Ok(())
+    }
+
+    /// 注册分析工具
+    fn register_analysis_tools(registry: &mut FunctionRegistry) -> AiResult<()> {
+        use crate::func::system::{AnalysisExecutor, create_analysis_functions};
+        use std::sync::Arc;
+
+        let analysis_functions = create_analysis_functions();
+        for function in analysis_functions {
+            registry.register_function(function)?;
+        }
+
+        let analysis_executor = Arc::new(AnalysisExecutor);
+        for function_name in analysis_executor.supported_functions() {
+            registry.register_executor(function_name, analysis_executor.clone())?;
         }
 
         Ok(())
@@ -815,7 +874,6 @@ mod global_registry_tests {
         // 创建测试专用注册表，避免全局状态污染
         let mut registry = GlobalFunctionRegistry::create_test_registry().unwrap();
 
-        // 注册一个测试函数
         let test_function = FunctionDefinition {
             name: "test-unregister".to_string(),
             description: "Test function for unregistration".to_string(),
@@ -870,24 +928,23 @@ mod global_registry_tests {
         // 验证注销成功
         assert!(!registry.contains_function("test-unregister"));
     }
+}
 
-    #[tokio::test]
-    async fn test_ensure_initialized() {
-        // 重置注册表
-        GlobalFunctionRegistry::reset();
+#[tokio::test]
+async fn test_ensure_initialized() {
+    // 重置注册表
+    GlobalFunctionRegistry::reset();
 
-        // 注册应该自动初始化
-        let test_function = FunctionDefinition {
-            name: "auto-init-function".to_string(),
-            description: "Auto init test function".to_string(),
-            parameters: vec![],
-        };
+    // 注册应该自动初始化
+    let test_function = FunctionDefinition {
+        name: "auto-init-function".to_string(),
+        description: "Auto init test function".to_string(),
+        parameters: vec![],
+    };
 
-        // 注册函数（应该自动初始化）
-        assert!(GlobalFunctionRegistry::register_function(test_function).is_ok());
+    assert!(GlobalFunctionRegistry::register_function(test_function).is_ok());
 
-        // 验证注册成功
-        let registry = GlobalFunctionRegistry::get_registry().unwrap();
-        assert!(registry.contains_function("auto-init-function"));
-    }
+    // 验证注册成功
+    let registry = GlobalFunctionRegistry::get_registry().unwrap();
+    assert!(registry.contains_function("auto-init-function"));
 }
