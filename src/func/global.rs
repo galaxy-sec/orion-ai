@@ -42,9 +42,20 @@ impl GlobalFunctionRegistry {
         // 如果尚未初始化，则创建新注册表
         log::debug!("Initializing global function registry");
         let registry = Self::create_and_register_tools()?;
-        let _ = instance
-            .global_registry
-            .set(Arc::new(RwLock::new(Some(registry))));
+
+        // 尝试设置注册表，如果 OnceLock 已经设置但内容为空，则强制重新设置
+        if instance.global_registry.get().is_some() {
+            // OnceLock 已经设置，但内容可能为空，我们需要直接修改内容
+            if let Some(registry_arc) = instance.global_registry.get() {
+                let mut registry_guard = registry_arc.write().unwrap();
+                *registry_guard = Some(registry);
+            }
+        } else {
+            // OnceLock 尚未设置，正常设置
+            let _ = instance
+                .global_registry
+                .set(Arc::new(RwLock::new(Some(registry))));
+        }
 
         // 验证已注册
         if let Some(registry_arc) = instance.global_registry.get() {
