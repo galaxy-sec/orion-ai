@@ -7,80 +7,218 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// 诊断模式枚举
+/// 诊断深度级别
 ///
-/// 定义了系统诊断的不同深度模式，用于控制诊断的详细程度和执行时间。
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Copy, Default)]
-pub enum DiagnosticMode {
-    /// 快速扫描模式 (200ms内完成)
+/// 定义系统诊断的深度级别，用于控制诊断的详细程度。
+/// 不绑定具体时间约束，而是描述相对的诊断深度。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub enum DiagnosticDepth {
+    /// 基础级别
     ///
-    /// 执行基础系统健康检查：
-    /// - 系统运行时间和负载
-    /// - 内存使用情况概览
-    /// - 基础进程信息
-    Quick,
-
-    /// 标准诊断模式 (1-2秒完成)
-    ///
-    /// 执行中等深度诊断：
-    /// - 所有快速模式检查
-    /// - 高资源消耗进程分析
-    /// - 详细的系统资源统计
+    /// 执行最基本的系统健康检查：
+    /// - 系统基本信息
+    /// - 基础资源使用情况
     #[default]
+    Basic,
+
+    /// 标准级别
+    ///
+    /// 执行中等深度的系统分析：
+    /// - 所有基础级别检查
+    /// - 进程分析
+    /// - 详细资源统计
     Standard,
 
-    /// 深度分析模式 (5-10秒完成)
+    /// 深度级别
     ///
-    /// 执行全面系统诊断：
-    /// - 所有标准模式检查
-    /// - I/O性能统计
+    /// 执行全面的系统诊断：
+    /// - 所有标准级别检查
+    /// - I/O性能分析
     /// - 网络连接分析
     /// - 综合性能评估
-    Deep,
+    Advanced,
+
+    /// 自定义级别
+    ///
+    /// 允许用户自定义诊断配置，
+    /// 通过 DiagnosticConfig 灵活控制诊断行为
+    Custom(DiagnosticConfig),
 }
 
-impl std::fmt::Display for DiagnosticMode {
+impl std::fmt::Display for DiagnosticDepth {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DiagnosticMode::Quick => write!(f, "quick"),
-            DiagnosticMode::Standard => write!(f, "standard"),
-            DiagnosticMode::Deep => write!(f, "deep"),
+            DiagnosticDepth::Basic => write!(f, "basic"),
+            DiagnosticDepth::Standard => write!(f, "standard"),
+            DiagnosticDepth::Advanced => write!(f, "advanced"),
+            DiagnosticDepth::Custom(_) => write!(f, "custom"),
         }
     }
 }
 
-impl DiagnosticMode {
-    /// 获取诊断模式的描述信息
-    pub fn description(&self) -> &'static str {
-        match self {
-            DiagnosticMode::Quick => "快速系统扫描 (200ms内)",
-            DiagnosticMode::Standard => "标准系统诊断 (1-2秒)",
-            DiagnosticMode::Deep => "深度系统分析 (5-10秒)",
+/// 诊断配置结构
+///
+/// 提供灵活的诊断配置选项，不硬编码时间约束，
+/// 允许用户根据具体需求调整诊断行为。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DiagnosticConfig {
+    /// 基础信息检查
+    pub check_basic_info: bool,
+
+    /// 进程分析
+    pub check_processes: bool,
+
+    /// I/O性能分析
+    pub check_io_performance: bool,
+
+    /// 网络分析
+    pub check_network: bool,
+
+    /// 采样次数
+    pub sampling_count: u32,
+
+    /// 采样间隔（秒）
+    pub sampling_interval: u32,
+
+    /// 超时时间（秒）
+    pub timeout_seconds: u64,
+}
+
+impl Default for DiagnosticConfig {
+    fn default() -> Self {
+        Self {
+            check_basic_info: true,
+            check_processes: true,
+            check_io_performance: false,
+            check_network: false,
+            sampling_count: 2,
+            sampling_interval: 1,
+            timeout_seconds: 15,
+        }
+    }
+}
+
+impl DiagnosticConfig {
+    /// 创建基础配置
+    pub fn basic() -> Self {
+        Self {
+            check_basic_info: true,
+            check_processes: false,
+            check_io_performance: false,
+            check_network: false,
+            sampling_count: 1,
+            sampling_interval: 1,
+            timeout_seconds: 5,
         }
     }
 
-    /// 获取诊断模式的超时时间（秒）
-    pub fn timeout_seconds(&self) -> u64 {
-        match self {
-            DiagnosticMode::Quick => 5,     // 5秒超时
-            DiagnosticMode::Standard => 15, // 15秒超时
-            DiagnosticMode::Deep => 30,     // 30秒超时
+    /// 创建标准配置
+    pub fn standard() -> Self {
+        Self {
+            check_basic_info: true,
+            check_processes: true,
+            check_io_performance: false,
+            check_network: false,
+            sampling_count: 2,
+            sampling_interval: 1,
+            timeout_seconds: 15,
         }
+    }
+
+    /// 创建高级配置
+    pub fn advanced() -> Self {
+        Self {
+            check_basic_info: true,
+            check_processes: true,
+            check_io_performance: true,
+            check_network: true,
+            sampling_count: 3,
+            sampling_interval: 1,
+            timeout_seconds: 30,
+        }
+    }
+
+    /// 验证配置的有效性
+    pub fn is_valid(&self) -> bool {
+        self.sampling_count >= 1
+            && self.sampling_count <= 10
+            && self.sampling_interval >= 1
+            && self.sampling_interval <= 5
+            && self.timeout_seconds >= 5
+            && self.timeout_seconds <= 60
+    }
+
+    /// 获取预计执行时间（秒）
+    pub fn estimated_duration(&self) -> u64 {
+        (self.sampling_count as u64 - 1) * self.sampling_interval as u64 + self.timeout_seconds
+    }
+}
+
+impl DiagnosticDepth {
+    /// 获取诊断深度级别的描述信息
+    pub fn description(&self) -> &'static str {
+        match self {
+            DiagnosticDepth::Basic => "基础诊断级别",
+            DiagnosticDepth::Standard => "标准诊断级别",
+            DiagnosticDepth::Advanced => "高级诊断级别",
+            DiagnosticDepth::Custom(_) => "自定义诊断级别",
+        }
+    }
+
+    /// 获取对应的诊断配置
+    pub fn to_config(&self) -> DiagnosticConfig {
+        match self {
+            DiagnosticDepth::Basic => DiagnosticConfig::basic(),
+            DiagnosticDepth::Standard => DiagnosticConfig::standard(),
+            DiagnosticDepth::Advanced => DiagnosticConfig::advanced(),
+            DiagnosticDepth::Custom(config) => config.clone(),
+        }
+    }
+
+    /// 从配置创建自定义深度级别
+    pub fn custom(config: DiagnosticConfig) -> Self {
+        DiagnosticDepth::Custom(config)
     }
 
     /// 检查是否应该执行进程分析
     pub fn should_analyze_processes(&self) -> bool {
-        matches!(self, DiagnosticMode::Standard | DiagnosticMode::Deep)
+        match self {
+            DiagnosticDepth::Basic => false,
+            DiagnosticDepth::Standard => true,
+            DiagnosticDepth::Advanced => true,
+            DiagnosticDepth::Custom(config) => config.check_processes,
+        }
     }
 
     /// 检查是否应该执行I/O分析
     pub fn should_analyze_io(&self) -> bool {
-        matches!(self, DiagnosticMode::Deep)
+        match self {
+            DiagnosticDepth::Basic => false,
+            DiagnosticDepth::Standard => false,
+            DiagnosticDepth::Advanced => true,
+            DiagnosticDepth::Custom(config) => config.check_io_performance,
+        }
     }
 
     /// 检查是否应该执行网络分析
     pub fn should_analyze_network(&self) -> bool {
-        matches!(self, DiagnosticMode::Deep)
+        match self {
+            DiagnosticDepth::Basic => false,
+            DiagnosticDepth::Standard => false,
+            DiagnosticDepth::Advanced => true,
+            DiagnosticDepth::Custom(config) => config.check_network,
+        }
+    }
+
+    /// 获取配置的超时时间
+    pub fn timeout_seconds(&self) -> u64 {
+        self.to_config().timeout_seconds
+    }
+
+    /// 获取配置的采样信息
+    pub fn sampling_info(&self) -> (u32, u32) {
+        let config = self.to_config();
+        (config.sampling_count, config.sampling_interval)
     }
 }
 
@@ -119,24 +257,13 @@ impl SamplingConfig {
         }
     }
 
-    /// 根据诊断模式生成自适应采样配置
-    pub fn for_diagnostic_mode(mode: &DiagnosticMode) -> Self {
-        match mode {
-            DiagnosticMode::Quick => Self {
-                count: 1,
-                interval: 1,
-                timeout: 5,
-            },
-            DiagnosticMode::Standard => Self {
-                count: 2,
-                interval: 1,
-                timeout: 15,
-            },
-            DiagnosticMode::Deep => Self {
-                count: 3,
-                interval: 1,
-                timeout: 30,
-            },
+    /// 根据诊断深度生成自适应采样配置
+    pub fn for_diagnostic_depth(depth: &DiagnosticDepth) -> Self {
+        let config = depth.to_config();
+        Self {
+            count: config.sampling_count,
+            interval: config.sampling_interval,
+            timeout: config.timeout_seconds,
         }
     }
 
@@ -234,8 +361,8 @@ pub struct DiagnosticReport {
     /// 报告生成时间
     pub timestamp: DateTime<Utc>,
 
-    /// 使用的诊断模式
-    pub mode: DiagnosticMode,
+    /// 使用的诊断深度
+    pub mode: DiagnosticDepth,
 
     /// 系统基础信息
     pub system_info: SystemInfo,
@@ -423,16 +550,22 @@ pub struct ExecutionSummary {
 
 impl DiagnosticReport {
     /// 创建新的诊断报告
-    pub fn new(mode: DiagnosticMode) -> Self {
+    pub fn new(depth: DiagnosticDepth) -> Self {
+        let mode_description = depth.description().to_string();
         Self {
             timestamp: Utc::now(),
-            mode,
+            mode: depth,
             system_info: SystemInfo::default(),
             performance_metrics: PerformanceMetrics::default(),
             issues_identified: Vec::new(),
             recommendations: Vec::new(),
-            execution_summary: ExecutionSummary::new(mode.to_string()),
+            execution_summary: ExecutionSummary::new(mode_description),
         }
+    }
+
+    /// 使用自定义配置创建诊断报告
+    pub fn with_config(config: DiagnosticConfig) -> Self {
+        Self::new(DiagnosticDepth::Custom(config))
     }
 
     /// 添加系统问题
@@ -539,28 +672,62 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_diagnostic_mode_display() {
-        assert_eq!(DiagnosticMode::Quick.to_string(), "quick");
-        assert_eq!(DiagnosticMode::Standard.to_string(), "standard");
-        assert_eq!(DiagnosticMode::Deep.to_string(), "deep");
+    fn test_diagnostic_depth_config() {
+        let basic_config = DiagnosticConfig::basic();
+        assert!(basic_config.check_basic_info);
+        assert!(!basic_config.check_processes);
+        assert_eq!(basic_config.timeout_seconds, 5);
+        assert!(basic_config.is_valid());
+
+        let standard_config = DiagnosticConfig::standard();
+        assert!(standard_config.check_basic_info);
+        assert!(standard_config.check_processes);
+        assert!(!standard_config.check_io_performance);
+        assert_eq!(standard_config.timeout_seconds, 15);
+        assert!(standard_config.is_valid());
+
+        let advanced_config = DiagnosticConfig::advanced();
+        assert!(advanced_config.check_basic_info);
+        assert!(advanced_config.check_processes);
+        assert!(advanced_config.check_io_performance);
+        assert!(advanced_config.check_network);
+        assert_eq!(advanced_config.timeout_seconds, 30);
+        assert!(advanced_config.is_valid());
     }
 
     #[test]
-    fn test_diagnostic_mode_properties() {
-        let quick = DiagnosticMode::Quick;
-        assert_eq!(quick.description(), "快速系统扫描 (200ms内)");
-        assert_eq!(quick.timeout_seconds(), 5);
-        assert!(!quick.should_analyze_processes());
-        assert!(!quick.should_analyze_io());
+    fn test_diagnostic_depth_properties() {
+        let basic = DiagnosticDepth::Basic;
+        assert_eq!(basic.description(), "基础诊断级别");
+        assert!(!basic.should_analyze_processes());
+        assert!(!basic.should_analyze_io());
+        assert_eq!(basic.timeout_seconds(), 5);
 
-        let standard = DiagnosticMode::Standard;
+        let standard = DiagnosticDepth::Standard;
         assert!(standard.should_analyze_processes());
         assert!(!standard.should_analyze_io());
+        assert_eq!(standard.timeout_seconds(), 15);
 
-        let deep = DiagnosticMode::Deep;
-        assert!(deep.should_analyze_processes());
-        assert!(deep.should_analyze_io());
-        assert!(deep.should_analyze_network());
+        let advanced = DiagnosticDepth::Advanced;
+        assert!(advanced.should_analyze_processes());
+        assert!(advanced.should_analyze_io());
+        assert!(advanced.should_analyze_network());
+        assert_eq!(advanced.timeout_seconds(), 30);
+
+        let custom_config = DiagnosticConfig {
+            check_basic_info: true,
+            check_processes: true,
+            check_io_performance: true,
+            check_network: false,
+            sampling_count: 4,
+            sampling_interval: 2,
+            timeout_seconds: 25,
+        };
+        let custom = DiagnosticDepth::custom(custom_config);
+        assert!(custom.should_analyze_processes());
+        assert!(custom.should_analyze_io());
+        assert!(!custom.should_analyze_network());
+        assert_eq!(custom.timeout_seconds(), 25);
     }
 
     #[test]
@@ -569,19 +736,19 @@ mod tests {
         assert_eq!(config.count, 3);
         assert_eq!(config.interval, 2);
         assert_eq!(config.timeout, 20);
-        assert_eq!(config.estimated_duration(), 24); // (3-1)*2 + 20 = 4 + 20 = 24
+        assert_eq!(config.estimated_duration(), 24); // (3-1)*2 + 20
         assert!(config.is_valid());
 
-        let adaptive = SamplingConfig::for_diagnostic_mode(&DiagnosticMode::Deep);
-        assert_eq!(adaptive.count, 3);
-        assert_eq!(adaptive.interval, 1);
-        assert_eq!(adaptive.timeout, 30);
-        assert_eq!(adaptive.estimated_duration(), 32); // (3-1)*1 + 30 = 2 + 30 = 32
+        // 测试从诊断深度创建采样配置
+        let depth = DiagnosticDepth::Advanced;
+        let (count, interval) = depth.sampling_info();
+        assert_eq!(count, 3);
+        assert_eq!(interval, 1);
     }
 
     #[test]
     fn test_diagnostic_report() {
-        let mut report = DiagnosticReport::new(DiagnosticMode::Standard);
+        let mut report = DiagnosticReport::new(DiagnosticDepth::Standard);
 
         // 添加测试问题
         let issue = SystemIssue {
@@ -609,18 +776,28 @@ mod tests {
 
         let summary = report.summary();
         assert!(summary.contains("Diagnostic Report"));
-        assert!(summary.contains("标准系统诊断 (1-2秒)")); // Mode description contains this
+        assert!(summary.contains("标准诊断级别"));
     }
 
     #[test]
     fn test_default_implementations() {
-        let default_mode = DiagnosticMode::default();
-        assert_eq!(default_mode, DiagnosticMode::Standard);
+        let default_depth = DiagnosticDepth::default();
+        assert_eq!(default_depth, DiagnosticDepth::Basic);
 
-        let default_config = SamplingConfig::default();
+        let default_config = DiagnosticConfig::default();
         assert!(default_config.is_valid());
 
-        let default_report = DiagnosticReport::new(DiagnosticMode::Quick);
-        assert_eq!(default_report.mode, DiagnosticMode::Quick);
+        // 测试自定义配置
+        let custom_config = DiagnosticConfig {
+            check_basic_info: true,
+            check_processes: false,
+            check_io_performance: true,
+            check_network: false,
+            sampling_count: 1,
+            sampling_interval: 1,
+            timeout_seconds: 10,
+        };
+        let custom_report = DiagnosticReport::with_config(custom_config);
+        assert!(matches!(custom_report.mode, DiagnosticDepth::Custom(_)));
     }
 }
