@@ -3,13 +3,16 @@
 //! 这个模块包含了orion_ai的统一类型定义，提供简化的结果类型。
 
 // 模块导出
+pub mod diagnosis;
 pub mod result;
 
 // 重新导出主要类型，便于使用
+pub use diagnosis::{DiagnosticMode, DiagnosticReport, SamplingConfig};
 pub use result::{ExecutionResult, ExecutionResultBuilder, ExecutionStatus};
 
 /// 预导入的常用类型和trait
 pub mod prelude {
+    pub use super::{DiagnosticMode, DiagnosticReport, SamplingConfig};
     pub use super::{ExecutionResult, ExecutionResultBuilder, ExecutionStatus};
 }
 
