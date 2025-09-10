@@ -466,7 +466,7 @@ mod global_registry_tests {
         let base_registry = GlobalFunctionRegistry::create_test_registry().unwrap();
 
         // 测试指定工具列表
-        let tools = vec!["git-status".to_string(), "git-add".to_string()];
+        let tools = ["git-status".to_string(), "git-add".to_string()];
 
         // 手动过滤函数（避免使用可能有状态问题的 get_registry_with_tools）
         let filtered_functions: Vec<String> = base_registry
@@ -480,7 +480,7 @@ mod global_registry_tests {
         assert!(!filtered_functions.contains(&"git-commit".to_string()));
 
         // 测试单个工具
-        let single_tool = vec!["git-status".to_string()];
+        let single_tool = ["git-status".to_string()];
         let single_functions: Vec<String> = base_registry
             .get_supported_function_names()
             .into_iter()
@@ -519,20 +519,20 @@ mod global_registry_tests {
         }
 
         // 测试不存在的工具
-        let nonexistent_tools = vec!["nonexistent_tool".to_string()];
+        let tools = ["nonexistent_tool".to_string()];
         let empty_functions: Vec<String> = base_registry
             .get_supported_function_names()
             .into_iter()
-            .filter(|name| nonexistent_tools.contains(name))
+            .filter(|name| tools.contains(name))
             .collect();
         assert_eq!(empty_functions.len(), 0);
 
         // 测试混合存在的和不存在的工具
-        let mixed_tools = vec!["git-status".to_string(), "nonexistent_tool".to_string()];
+        let tools = ["git-status".to_string(), "nonexistent_tool".to_string()];
         let mixed_functions: Vec<String> = base_registry
             .get_supported_function_names()
             .into_iter()
-            .filter(|name| mixed_tools.contains(name))
+            .filter(|name| tools.contains(name))
             .collect();
         assert_eq!(mixed_functions.len(), 1);
         assert!(mixed_functions.contains(&"git-status".to_string()));

@@ -1,9 +1,15 @@
+pub mod analysis;
+pub mod diagnosis;
 pub mod fs;
+pub mod monitor;
 pub mod net;
 pub mod sys;
 
 // 重新导出主要的结构体和函数
+pub use analysis::{AnalysisExecutor, create_analysis_functions};
+pub use diagnosis::{DiagnosisExecutor, create_diagnosis_functions};
 pub use fs::{FileSystemExecutor, create_fs_functions};
+pub use monitor::{MonitorExecutor, create_monitor_functions};
 pub use net::{NetworkExecutor, create_net_functions};
 pub use sys::{SystemInfoExecutor, create_sys_functions};
 
