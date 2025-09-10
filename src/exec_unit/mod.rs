@@ -4,8 +4,13 @@
 //! 提供统一的执行接口。
 
 mod builder;
+mod diagnosis;
 mod unit;
 
 // 重新导出主要类型
 pub use builder::AiExecUnitBuilder;
+pub use diagnosis::{
+    DiagnosisError, DiagnosticExecutor, ProgressiveDiagnosis, deep_analysis, progressive_diagnosis,
+    quick_health_check, standard_diagnosis,
+};
 pub use unit::AiExecUnit;
