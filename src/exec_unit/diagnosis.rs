@@ -14,6 +14,7 @@ use chrono::{DateTime, Utc};
 use serde_json::json;
 use std::collections::HashMap;
 use std::time::Instant;
+use uuid;
 
 /// 诊断执行器特质
 ///
