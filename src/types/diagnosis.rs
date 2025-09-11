@@ -605,6 +605,108 @@ impl DiagnosticReport {
             self.execution_summary.total_duration_seconds
         )
     }
+
+    /// 生成格式化的详细报告
+    pub fn formatted_report(&self) -> String {
+        let mut report = String::new();
+        
+        // 报告标题
+        report.push_str(&format!("=== 系统诊断报告 ===\n"));
+        report.push_str(&format!("时间: {}\n", self.timestamp.format("%Y-%m-%d %H:%M:%S UTC")));
+        report.push_str(&format!("诊断模式: {}\n\n", self.mode.description()));
+        
+        // 系统信息
+        report.push_str("--- 系统信息 ---\n");
+        report.push_str(&format!("运行时间: {}\n", self.system_info.uptime));
+        if let Some(hostname) = &self.system_info.hostname {
+            report.push_str(&format!("主机名: {}\n", hostname));
+        }
+        if let Some(os_info) = &self.system_info.os_info {
+            report.push_str(&format!("操作系统: {}\n", os_info));
+        }
+        if let Some(cpu_cores) = self.system_info.cpu_cores {
+            report.push_str(&format!("CPU核心数: {}\n", cpu_cores));
+        }
+        report.push('\n');
+        
+        // 性能指标
+        report.push_str("--- 性能指标 ---\n");
+        report.push_str(&format!("CPU使用率: {:.1}%\n", self.performance_metrics.cpu_metrics.usage_percent));
+        report.push_str(&format!("内存使用率: {:.1}%\n", self.performance_metrics.memory_metrics.usage_percent));
+        if let Some(io_metrics) = &self.performance_metrics.io_metrics {
+            report.push_str(&format!("I/O等待: {:.1}%\n", io_metrics.io_wait_percent));
+            report.push_str(&format!("磁盘使用率: {:.1}%\n", io_metrics.disk_usage_percent));
+        }
+        if let Some(network_metrics) = &self.performance_metrics.network_metrics {
+            report.push_str(&format!("TCP连接数: {}\n", network_metrics.tcp_connections));
+            report.push_str(&format!("UDP连接数: {}\n", network_metrics.udp_connections));
+        }
+        report.push('\n');
+        
+        // 识别的问题
+        if !self.issues_identified.is_empty() {
+            report.push_str("--- 识别的问题 ---\n");
+            for (i, issue) in self.issues_identified.iter().enumerate() {
+                report.push_str(&format!("{}. [{}] {}\n", i + 1, issue.severity_to_chinese(), issue.description));
+                if !issue.recommendations.is_empty() {
+                    report.push_str("   建议: ");
+                    for (j, rec) in issue.recommendations.iter().enumerate() {
+                        if j > 0 {
+                            report.push_str(", ");
+                        }
+                        report.push_str(rec);
+                    }
+                    report.push('\n');
+                }
+                report.push('\n');
+            }
+        } else {
+            report.push_str("--- 识别的问题 ---\n");
+            report.push_str("未发现系统问题\n\n");
+        }
+        
+        // 建议
+        if !self.recommendations.is_empty() {
+            report.push_str("--- 建议 ---\n");
+            for (i, rec) in self.recommendations.iter().enumerate() {
+                report.push_str(&format!("{}. [优先级: {}] {}\n", i + 1, rec.priority, rec.title));
+                report.push_str(&format!("   {}\n", rec.description));
+                if !rec.steps.is_empty() {
+                    report.push_str("   操作步骤:\n");
+                    for step in &rec.steps {
+                        report.push_str(&format!("   - {}\n", step));
+                    }
+                }
+                report.push_str(&format!("   预期效果: {}\n\n", rec.expected_outcome));
+            }
+        }
+        
+        // 执行摘要
+        report.push_str("--- 执行摘要 ---\n");
+        report.push_str(&format!("总执行时间: {:.2}秒\n", self.execution_summary.total_duration_seconds));
+        report.push_str(&format!("成功执行函数: {}\n", self.execution_summary.successful_functions));
+        report.push_str(&format!("失败执行函数: {}\n", self.execution_summary.failed_functions));
+        report.push_str(&format!("执行状态: {}\n", self.execution_summary.status));
+        
+        report
+    }
+}
+
+impl IssueSeverity {
+    /// 将严重程度转换为中文描述
+    pub fn to_chinese(&self) -> &'static str {
+        match self {
+            IssueSeverity::Info => "信息",
+            IssueSeverity::Warning => "警告",
+            IssueSeverity::Error => "错误",
+            IssueSeverity::Critical => "严重",
+        }
+    }
+    
+    /// 将严重程度转换为中文描述（用于格式化输出）
+    pub fn severity_to_chinese(&self) -> &'static str {
+        self.to_chinese()
+    }
 }
 
 impl Default for SystemInfo {
@@ -777,6 +879,52 @@ mod tests {
         let summary = report.summary();
         assert!(summary.contains("Diagnostic Report"));
         assert!(summary.contains("标准诊断级别"));
+    }
+
+    #[test]
+    fn test_diagnostic_report_formatted_report() {
+        let mut report = DiagnosticReport::new(DiagnosticDepth::Standard);
+
+        // 添加测试问题
+        let issue = SystemIssue {
+            issue_type: SystemIssueType::HighCpuUsage,
+            description: "CPU使用率过高".to_string(),
+            severity: IssueSeverity::Warning,
+            metrics: HashMap::new(),
+            recommendations: vec!["检查高CPU进程".to_string()],
+        };
+        report.add_issue(issue);
+
+        // 添加测试建议
+        let recommendation = Recommendation {
+            title: "优化CPU使用".to_string(),
+            description: "建议检查和优化高CPU使用进程".to_string(),
+            priority: 3,
+            steps: vec!["使用top命令检查CPU使用".to_string()],
+            expected_outcome: "CPU使用率降低到正常范围".to_string(),
+        };
+        report.add_recommendation(recommendation);
+
+        let formatted = report.formatted_report();
+        
+        // 验证报告包含必要部分
+        assert!(formatted.contains("系统诊断报告"));
+        assert!(formatted.contains("CPU使用率过高"));
+        assert!(formatted.contains("优化CPU使用"));
+        assert!(formatted.contains("严重程度: 警告"));
+        assert!(formatted.contains("优先级: 3"));
+    }
+
+    #[test]
+    fn test_issue_severity_to_chinese() {
+        assert_eq!(IssueSeverity::Critical.to_chinese(), "严重");
+        assert_eq!(IssueSeverity::Warning.to_chinese(), "警告");
+        assert_eq!(IssueSeverity::Info.to_chinese(), "信息");
+        
+        // 测试静态方法
+        assert_eq!(IssueSeverity::severity_to_chinese(&IssueSeverity::Critical), "严重");
+        assert_eq!(IssueSeverity::severity_to_chinese(&IssueSeverity::Warning), "警告");
+        assert_eq!(IssueSeverity::severity_to_chinese(&IssueSeverity::Info), "信息");
     }
 
     #[test]

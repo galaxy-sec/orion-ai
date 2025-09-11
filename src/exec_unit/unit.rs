@@ -1,6 +1,7 @@
 use crate::{
     AiClient, AiResult, AiRoleID, FunctionResult, client::AiClientTrait,
     func::registry::FunctionRegistry, types::result::ExecutionResult,
+    types::diagnosis::{DiagnosticConfig, DiagnosticDepth, DiagnosticReport, ProgressiveDiagnosis},
 };
 use getset::{Getters, MutGetters, Setters, WithSetters};
 
@@ -10,6 +11,7 @@ pub struct AiExecUnit {
     client: AiClient,
     role: AiRoleID,
     registry: FunctionRegistry,
+    diagnostic_config: Option<DiagnosticConfig>,
 }
 
 impl std::fmt::Debug for AiExecUnit {
@@ -38,6 +40,29 @@ impl AiExecUnit {
             client,
             role,
             registry,
+            diagnostic_config: None,
+        }
+    }
+
+    /// 创建新的执行单元（带诊断配置）
+    ///
+    /// # 参数
+    ///
+    /// * `client` - AI客户端实例
+    /// * `role` - AI角色标识
+    /// * `registry` - 函数注册表
+    /// * `diagnostic_config` - 诊断配置
+    pub fn with_diagnostic_config(
+        client: AiClient,
+        role: AiRoleID,
+        registry: FunctionRegistry,
+        diagnostic_config: DiagnosticConfig,
+    ) -> Self {
+        Self {
+            client,
+            role,
+            registry,
+            diagnostic_config: Some(diagnostic_config),
         }
     }
 
@@ -86,6 +111,64 @@ impl AiExecUnit {
         Ok(ExecutionResult::new(response.content).with_tool_calls(tool_results))
     }
 
+    /// 执行系统诊断
+    ///
+    /// # 参数
+    ///
+    /// * `depth` - 诊断深度级别
+    ///
+    /// # 返回
+    ///
+    /// 返回诊断报告
+    pub async fn execute_diagnosis(&self, depth: DiagnosticDepth) -> AiResult<DiagnosticReport> {
+        let config = depth.to_config();
+        self.execute_diagnosis_with_config(config).await
+    }
+
+    /// 执行系统诊断（使用自定义配置）
+    ///
+    /// # 参数
+    ///
+    /// * `config` - 诊断配置
+    ///
+    /// # 返回
+    ///
+    /// 返回诊断报告
+    pub async fn execute_diagnosis_with_config(&self, config: DiagnosticConfig) -> AiResult<DiagnosticReport> {
+        let diagnosis = ProgressiveDiagnosis::new(config);
+        diagnosis
+            .execute_progressive_diagnosis(&self.registry)
+            .await
+            .map_err(|e| crate::OrionAiReason::from_diagnosis(format!("诊断执行失败: {}", e)))
+    }
+
+    /// 执行快速健康检查
+    ///
+    /// # 返回
+    ///
+    /// 返回诊断报告
+    pub async fn quick_health_check(&self) -> AiResult<DiagnosticReport> {
+        self.execute_diagnosis(DiagnosticDepth::Basic).await
+    }
+
+    /// 执行标准诊断
+    ///
+    /// # 返回
+    ///
+    /// 返回诊断报告
+    pub async fn standard_diagnosis(&self) -> AiResult<DiagnosticReport> {
+        self.execute_diagnosis(DiagnosticDepth::Standard).await
+    }
+
+    /// 执行深度分析
+    ///
+    /// # 返回
+    ///
+    /// 返回诊断报告
+    pub async fn deep_analysis(&self) -> AiResult<DiagnosticReport> {
+        self.execute_diagnosis(DiagnosticDepth::Advanced).await
+    }
+
     /// 消费执行单元，返回其组件
     ///
     /// # 返回
@@ -99,7 +182,7 @@ impl AiExecUnit {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{client::AiClientBuilder, config::AiConfig};
+    use crate::{client::AiClientBuilder, config::AiConfig, types::diagnosis::{DiagnosticConfig, DiagnosticDepth}};
 
     #[tokio::test]
     async fn test_exec_unit_creation() {
@@ -115,6 +198,24 @@ mod tests {
         let exec_unit = AiExecUnit::new(client, role.clone(), registry);
 
         assert_eq!(exec_unit.role(), &role);
+        assert!(exec_unit.diagnostic_config().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_exec_unit_creation_with_diagnostic_config() {
+        // 测试带诊断配置的执行单元创建
+        let config = AiConfig::example();
+        let client = AiClientBuilder::new(config).build().unwrap();
+        let role = client.roles().default_role().clone();
+        let registry = FunctionRegistry::new();
+        let diagnostic_config = DiagnosticConfig::basic();
+
+        let exec_unit = AiExecUnit::with_diagnostic_config(
+            client, role.clone(), registry, diagnostic_config.clone(),
+        );
+
+        assert_eq!(exec_unit.role(), &role);
+        assert_eq!(exec_unit.diagnostic_config(), &Some(diagnostic_config));
     }
 
     #[test]
@@ -150,5 +251,28 @@ mod tests {
             updated_unit.registry().get_functions().len(),
             registry2.get_functions().len()
         );
+    }
+
+    #[test]
+    fn test_diagnostic_config_methods() {
+        // 测试诊断配置相关方法
+        let config = AiConfig::example();
+        let client = AiClientBuilder::new(config).build().unwrap();
+        let role = client.roles().default_role().clone();
+        let registry = FunctionRegistry::new();
+
+        let mut exec_unit = AiExecUnit::new(client, role, registry);
+        
+        // 测试初始状态
+        assert!(exec_unit.diagnostic_config().is_none());
+        
+        // 测试设置诊断配置
+        let diagnostic_config = DiagnosticConfig::standard();
+        exec_unit.set_diagnostic_config(Some(diagnostic_config.clone()));
+        assert_eq!(exec_unit.diagnostic_config(), &Some(diagnostic_config));
+        
+        // 测试清除诊断配置
+        exec_unit.set_diagnostic_config(None);
+        assert!(exec_unit.diagnostic_config().is_none());
     }
 }

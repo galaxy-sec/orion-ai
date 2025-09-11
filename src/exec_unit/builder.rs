@@ -4,7 +4,7 @@ use orion_variate::vars::EnvDict;
 
 use crate::{
     AiExecUnit, AiRoleID, client::AiClientBuilder, config::AiConfig, error::OrionAiReason,
-    func::registry::FunctionRegistry,
+    func::registry::FunctionRegistry, types::diagnosis::{DiagnosticConfig, DiagnosticDepth},
 };
 
 #[derive(Clone, Debug, Default)]
@@ -14,6 +14,7 @@ pub struct AiExecUnitBuilder {
     role: Option<AiRoleID>,
     tools: Vec<String>,
     timeout: Option<u64>,
+    diagnostic_config: Option<DiagnosticConfig>,
 }
 
 impl AiExecUnitBuilder {
@@ -120,6 +121,34 @@ impl AiExecUnitBuilder {
         self
     }
 
+    /// 设置诊断配置
+    ///
+    /// # 参数
+    ///
+    /// * `config` - 诊断配置
+    ///
+    /// # 返回
+    ///
+    /// 返回构建器实例（用于链式调用）
+    pub fn with_diagnostic_config(mut self, config: DiagnosticConfig) -> Self {
+        self.diagnostic_config = Some(config);
+        self
+    }
+
+    /// 设置诊断深度
+    ///
+    /// # 参数
+    ///
+    /// * `depth` - 诊断深度级别
+    ///
+    /// # 返回
+    ///
+    /// 返回构建器实例（用于链式调用）
+    pub fn with_diagnostic_depth(mut self, depth: DiagnosticDepth) -> Self {
+        self.diagnostic_config = Some(depth.to_config());
+        self
+    }
+
     /// 构建执行单元
     ///
     /// # 返回
@@ -151,7 +180,13 @@ impl AiExecUnitBuilder {
         let registry = client.get_registry_with_tools(&self.tools)?;
 
         // 创建执行单元
-        Ok(AiExecUnit::new(client, role, registry))
+        if let Some(diagnostic_config) = self.diagnostic_config {
+            Ok(AiExecUnit::with_diagnostic_config(
+                client, role, registry, diagnostic_config,
+            ))
+        } else {
+            Ok(AiExecUnit::new(client, role, registry))
+        }
     }
 
     /// 构建执行单元，但不验证工具是否存在
@@ -193,7 +228,13 @@ impl AiExecUnitBuilder {
         };
 
         // 创建执行单元
-        Ok(AiExecUnit::new(client, role, registry))
+        if let Some(diagnostic_config) = self.diagnostic_config {
+            Ok(AiExecUnit::with_diagnostic_config(
+                client, role, registry, diagnostic_config,
+            ))
+        } else {
+            Ok(AiExecUnit::new(client, role, registry))
+        }
     }
 
     /// 从示例配置创建构建器
@@ -211,6 +252,7 @@ impl AiExecUnitBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{client::AiClientBuilder, config::AiConfig, types::diagnosis::{DiagnosticConfig, DiagnosticDepth}};
 
     #[test]
     fn test_builder_creation() {
@@ -218,6 +260,7 @@ mod tests {
         assert!(builder.config.is_none());
         assert!(builder.role.is_none());
         assert!(builder.tools.is_empty());
+        assert!(builder.diagnostic_config.is_none());
     }
 
     #[test]
@@ -263,6 +306,7 @@ mod tests {
         assert_eq!(builder.role, cloned.role);
         assert_eq!(builder.tools, cloned.tools);
         assert_eq!(builder.timeout, cloned.timeout);
+        assert_eq!(builder.diagnostic_config, cloned.diagnostic_config);
     }
 
     #[test]
@@ -275,6 +319,27 @@ mod tests {
         assert!(debug_str.contains("AiExecUnitBuilder"));
         assert!(debug_str.contains("developer"));
         assert!(debug_str.contains("120"));
+    }
+
+    #[test]
+    fn test_builder_with_diagnostic_config() {
+        let diagnostic_config = DiagnosticConfig::basic();
+        let builder = AiExecUnitBuilder::default()
+            .with_diagnostic_config(diagnostic_config.clone());
+
+        assert_eq!(builder.diagnostic_config, Some(diagnostic_config));
+    }
+
+    #[test]
+    fn test_builder_with_diagnostic_depth() {
+        let builder = AiExecUnitBuilder::default()
+            .with_diagnostic_depth(DiagnosticDepth::Standard);
+
+        assert!(builder.diagnostic_config.is_some());
+        assert_eq!(
+            builder.diagnostic_config.as_ref().unwrap().depth,
+            DiagnosticDepth::Standard
+        );
     }
 
     #[tokio::test]
@@ -295,6 +360,26 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_build_with_diagnostic_config() {
+        // 测试带诊断配置的构建
+        let builder = AiExecUnitBuilder::from_example()
+            .with_role("developer")
+            .with_diagnostic_config(DiagnosticConfig::standard());
+
+        match builder.build() {
+            Ok(exec_unit) => {
+                // 构建成功，验证诊断配置
+                assert!(exec_unit.diagnostic_config().is_some());
+                println!("带诊断配置的构建成功");
+            }
+            Err(e) => {
+                // 在没有有效API密钥的环境中，构建失败是正常的
+                println!("预期的构建失败（缺少API密钥）: {}", e);
+            }
+        }
+    }
+
+    #[tokio::test]
     async fn test_build_ignoring_tool_errors() {
         // 测试忽略工具错误的构建方法
         let builder = AiExecUnitBuilder::from_example()
@@ -305,6 +390,27 @@ mod tests {
             Ok(_) => {
                 // 即使工具不存在，构建也应该成功
                 println!("构建成功（忽略了工具错误）");
+            }
+            Err(e) => {
+                // 如果构建失败，可能是配置问题
+                println!("构建失败: {}", e);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_build_ignoring_tool_errors_with_diagnostic_config() {
+        // 测试带诊断配置的忽略工具错误构建方法
+        let builder = AiExecUnitBuilder::from_example()
+            .with_role("developer")
+            .with_tools(vec!["non-existent-tool".to_string()])
+            .with_diagnostic_config(DiagnosticConfig::deep());
+
+        match builder.build_ignoring_tool_errors() {
+            Ok(exec_unit) => {
+                // 即使工具不存在，构建也应该成功，验证诊断配置
+                assert!(exec_unit.diagnostic_config().is_some());
+                println!("带诊断配置的构建成功（忽略了工具错误）");
             }
             Err(e) => {
                 // 如果构建失败，可能是配置问题

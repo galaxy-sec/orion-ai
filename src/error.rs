@@ -45,6 +45,8 @@ pub enum AiErrReason {
     PermissionDenied(String),
     #[error("Internal error: {0}")]
     InternalError(String),
+    #[error("Diagnosis error: {0}")]
+    DiagnosisError(String),
 }
 
 impl From<SerdeReason> for OrionAiReason {
@@ -62,6 +64,13 @@ impl From<OrionSecReason> for OrionAiReason {
             OrionSecReason::Sec(sec) => Self::Sec(sec),
             OrionSecReason::Uvs(uvs) => Self::Uvs(uvs),
         }
+    }
+}
+
+impl OrionAiReason {
+    /// 从诊断错误创建OrionAiReason
+    pub fn from_diagnosis(msg: String) -> Self {
+        Self::Ai(AiErrReason::DiagnosisError(msg))
     }
 }
 impl ErrorCode for OrionAiReason {
