@@ -5,6 +5,7 @@
 
 mod builder;
 mod diagnosis;
+mod parsers;
 mod unit;
 
 // 重新导出主要类型
@@ -13,4 +14,5 @@ pub use diagnosis::{
     DiagnosisError, DiagnosticExecutor, ProgressiveDiagnosis, deep_analysis, progressive_diagnosis,
     quick_health_check, standard_diagnosis,
 };
+pub use parsers::{ParseError, ParseResult, Parser, ParserRegistry, ParserTrait, ParsedData};
 pub use unit::AiExecUnit;
