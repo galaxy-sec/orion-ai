@@ -611,7 +611,7 @@ impl DiagnosticReport {
         let mut report = String::new();
         
         // 报告标题
-        report.push_str(&format!("=== 系统诊断报告 ===\n"));
+        report.push_str("=== 系统诊断报告 ===\n");
         report.push_str(&format!("时间: {}\n", self.timestamp.format("%Y-%m-%d %H:%M:%S UTC")));
         report.push_str(&format!("诊断模式: {}\n\n", self.mode.description()));
         
@@ -647,7 +647,8 @@ impl DiagnosticReport {
         if !self.issues_identified.is_empty() {
             report.push_str("--- 识别的问题 ---\n");
             for (i, issue) in self.issues_identified.iter().enumerate() {
-                report.push_str(&format!("{}. [{}] {}\n", i + 1, issue.severity_to_chinese(), issue.description));
+                report.push_str(&format!("{}. {}\n", i + 1, issue.description));
+                report.push_str(&format!("   严重程度: {}\n", issue.severity.severity_to_chinese()));
                 if !issue.recommendations.is_empty() {
                     report.push_str("   建议: ");
                     for (j, rec) in issue.recommendations.iter().enumerate() {

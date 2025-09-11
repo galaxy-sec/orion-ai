@@ -1,5 +1,4 @@
-use orion_conf::UvsConfFrom;
-use orion_error::ErrorWith;
+use orion_conf::{UvsConfFrom, ErrorWith};
 use orion_variate::vars::EnvDict;
 
 use crate::{
@@ -26,6 +25,7 @@ impl AiExecUnitBuilder {
             role: None,
             tools: Vec::new(),
             timeout: Some(60), // 默认超时60秒
+            diagnostic_config: None,
         }
     }
 
@@ -181,7 +181,7 @@ impl AiExecUnitBuilder {
 
         // 创建执行单元
         if let Some(diagnostic_config) = self.diagnostic_config {
-            Ok(AiExecUnit::with_diagnostic_config(
+            Ok(AiExecUnit::new_with_diagnostic_config(
                 client, role, registry, diagnostic_config,
             ))
         } else {
@@ -229,7 +229,7 @@ impl AiExecUnitBuilder {
 
         // 创建执行单元
         if let Some(diagnostic_config) = self.diagnostic_config {
-            Ok(AiExecUnit::with_diagnostic_config(
+            Ok(AiExecUnit::new_with_diagnostic_config(
                 client, role, registry, diagnostic_config,
             ))
         } else {
@@ -252,7 +252,7 @@ impl AiExecUnitBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{client::AiClientBuilder, config::AiConfig, types::diagnosis::{DiagnosticConfig, DiagnosticDepth}};
+    use crate::types::diagnosis::{DiagnosticConfig, DiagnosticDepth};
 
     #[test]
     fn test_builder_creation() {
@@ -336,10 +336,8 @@ mod tests {
             .with_diagnostic_depth(DiagnosticDepth::Standard);
 
         assert!(builder.diagnostic_config.is_some());
-        assert_eq!(
-            builder.diagnostic_config.as_ref().unwrap().depth,
-            DiagnosticDepth::Standard
-        );
+        assert!(builder.diagnostic_config.as_ref().unwrap().check_processes);
+        assert!(!builder.diagnostic_config.as_ref().unwrap().check_io_performance);
     }
 
     #[tokio::test]
@@ -404,7 +402,7 @@ mod tests {
         let builder = AiExecUnitBuilder::from_example()
             .with_role("developer")
             .with_tools(vec!["non-existent-tool".to_string()])
-            .with_diagnostic_config(DiagnosticConfig::deep());
+            .with_diagnostic_config(DiagnosticConfig::advanced());
 
         match builder.build_ignoring_tool_errors() {
             Ok(exec_unit) => {

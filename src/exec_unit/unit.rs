@@ -1,8 +1,9 @@
 use crate::{
     AiClient, AiResult, AiRoleID, FunctionResult, client::AiClientTrait,
     func::registry::FunctionRegistry, types::result::ExecutionResult,
-    types::diagnosis::{DiagnosticConfig, DiagnosticDepth, DiagnosticReport, ProgressiveDiagnosis},
+    types::diagnosis::{DiagnosticConfig, DiagnosticDepth, DiagnosticReport},
 };
+use crate::exec_unit::ProgressiveDiagnosis;
 use getset::{Getters, MutGetters, Setters, WithSetters};
 
 #[derive(Getters, MutGetters, Setters, WithSetters)]
@@ -52,7 +53,7 @@ impl AiExecUnit {
     /// * `role` - AI角色标识
     /// * `registry` - 函数注册表
     /// * `diagnostic_config` - 诊断配置
-    pub fn with_diagnostic_config(
+    pub fn new_with_diagnostic_config(
         client: AiClient,
         role: AiRoleID,
         registry: FunctionRegistry,
@@ -139,7 +140,7 @@ impl AiExecUnit {
         diagnosis
             .execute_progressive_diagnosis(&self.registry)
             .await
-            .map_err(|e| crate::OrionAiReason::from_diagnosis(format!("诊断执行失败: {}", e)))
+            .map_err(|e| crate::OrionAiReason::from_diagnosis(format!("诊断执行失败: {}", e)).into())
     }
 
     /// 执行快速健康检查
@@ -182,7 +183,7 @@ impl AiExecUnit {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{client::AiClientBuilder, config::AiConfig, types::diagnosis::{DiagnosticConfig, DiagnosticDepth}};
+    use crate::{client::AiClientBuilder, config::AiConfig, types::diagnosis::DiagnosticConfig};
 
     #[tokio::test]
     async fn test_exec_unit_creation() {
@@ -210,7 +211,7 @@ mod tests {
         let registry = FunctionRegistry::new();
         let diagnostic_config = DiagnosticConfig::basic();
 
-        let exec_unit = AiExecUnit::with_diagnostic_config(
+        let exec_unit = AiExecUnit::new_with_diagnostic_config(
             client, role.clone(), registry, diagnostic_config.clone(),
         );
 
