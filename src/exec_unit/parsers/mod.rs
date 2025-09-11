@@ -4,6 +4,7 @@
 //! 支持进程、I/O和网络数据的解析。
 
 mod process;
+mod network;
 
 use std::fmt;
 use thiserror::Error;
