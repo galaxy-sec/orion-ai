@@ -5,7 +5,7 @@ mod error;
 pub mod exec_unit;
 pub mod factory;
 pub mod func;
-mod infra;
+pub mod infra;
 pub mod provider;
 pub mod providers;
 mod roleid;

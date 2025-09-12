@@ -1089,6 +1089,38 @@ pub struct DiagnosticReport {
 - 阻碍因素：无
 - 状态：成功完成
 
+[2025-09-10 20:00:00 UTC]
+- 已修改：创建了 `/docs/SYSTEM_DIAGNOSIS_DEVELOPMENT.md` 开发进展记录文档
+- 更改：创建了系统诊断工具开发进展记录文档，包含已完成功能、当前状态、代码位置索引和下一步开发计划
+- 原因：记录系统诊断工具的完整开发进展，为后续开发提供参考和跟踪
+- 阻碍因素：无
+- 状态：成功完成
+
+[2025-09-10 20:15:00 UTC]
+- 已修改：将 `/examples/sys-diagnose.rs` 从硬编码诊断模式改为AI驱动诊断模式
+- 更改：
+  - 移除了硬编码的诊断方法调用（standard_diagnosis、quick_health_check、deep_analysis）
+  - 新增三个AI驱动的诊断场景：
+    1. AI对话式系统诊断（ai_driven_system_diagnosis）
+    2. 交互式问题排查（interactive_troubleshooting）
+    3. 智能性能优化建议（intelligent_performance_analysis）
+  - 使用operations角色替代developer角色进行系统诊断
+  - 通过execute和execute_with_func方法实现AI驱动的诊断分析
+- 原因：将静态诊断逻辑转变为AI驱动的动态诊断模式，提供更好的用户体验和智能化分析
+- 阻碍因素：无
+- 状态：成功（已通过cargo check验证）
+
+2025-09-10 20:45:00 UTC - 新增错误信息展示功能
+- 新增函数：demonstrate_error_scenarios，位于/examples/sys-diagnose.rs
+- 功能描述：实现5种系统诊断错误场景的AI驱动展示
+  - 权限不足错误处理
+  - 文件/目录不存在错误
+  - 网络连接诊断错误
+  - 命令执行错误
+  - 系统资源不足错误
+- 实现特点：每个场景都通过AI分析错误原因并提供具体解决方案
+- 验证状态：已通过cargo check编译验证，无错误
+
 [2025-09-10 19:30:00 UTC]
 - 已修改：更新了 `/docs/ARCHITECTURE.md` 文档
 - 更改：在架构文档中添加了诊断功能的架构设计，包括分级诊断策略、诊断配置系统、诊断执行流程、诊断结果处理、错误处理机制、诊断功能集成和优化等内容
