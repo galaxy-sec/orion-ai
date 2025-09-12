@@ -6,7 +6,8 @@ use crate::{
     FunctionResult, error::OrionAiReason,
 };
 
-use super::{execute_command_with_timeout, parse_function_arguments};
+use super::{execute_command_with_timeout, parse_function_arguments, detect_platform, get_platform_specific_command, platform_name, CommandType, Platform};
+use super::platform::parse_vmstat_output;
 
 // 性能分析函数执行器
 pub struct AnalysisExecutor;
@@ -24,11 +25,43 @@ impl FunctionExecutor for AnalysisExecutor {
                 let safe_count = count.clamp(1, 5);
                 let safe_interval = interval.clamp(1, 3);
 
+                // 检测当前平台
+                let platform = detect_platform();
+                let platform_name_str = platform_name(&platform);
+                
+                // 获取平台特定的iostat命令
+                let (command, default_args) = get_platform_specific_command(CommandType::Iostat, &platform);
+                
+                // 构建命令参数
+                let mut command_args = default_args.clone();
+                
+                // 根据平台和参数调整命令
                 let interval_str = safe_interval.to_string();
                 let count_str = safe_count.to_string();
-                let command_args = vec![interval_str.as_str(), count_str.as_str()];
+                
+                match platform {
+                    Platform::MacOS => {
+                        // macOS的iostat命令参数
+                        command_args.push(&interval_str);
+                        command_args.push(&count_str);
+                    },
+                    Platform::Linux => {
+                        // Linux的iostat命令参数
+                        command_args.push(&interval_str);
+                        command_args.push(&count_str);
+                    },
+                    Platform::Windows => {
+                        // Windows没有原生的iostat命令，使用typeperf替代
+                        command_args.push(&interval_str);
+                    },
+                    Platform::Unknown => {
+                        // 未知平台，尝试通用参数
+                        command_args.push(&interval_str);
+                        command_args.push(&count_str);
+                    }
+                }
 
-                match execute_command_with_timeout("iostat", &command_args, 20).await {
+                match execute_command_with_timeout(&command, &command_args, 20).await {
                     Ok(output) => {
                         let result = String::from_utf8_lossy(&output.stdout).to_string();
                         let lines: Vec<String> = result.lines().map(|s| s.to_string()).collect();
@@ -39,6 +72,11 @@ impl FunctionExecutor for AnalysisExecutor {
                                 "iostat_output": lines,
                                 "count": safe_count,
                                 "interval": safe_interval,
+                                "platform": platform_name_str,
+                                "command": {
+                                    "executable": command,
+                                    "arguments": command_args
+                                },
                                 "success": output.status.success()
                             }),
                             error: if output.status.success() {
@@ -67,37 +105,123 @@ impl FunctionExecutor for AnalysisExecutor {
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
 
-                let mut command_args = vec!["-an"];
-
-                if show_tcp && !show_udp {
-                    command_args.push("-p");
-                    command_args.push("tcp");
-                } else if show_udp && !show_tcp {
-                    command_args.push("-p");
-                    command_args.push("udp");
+                // 检测当前平台
+                let platform = detect_platform();
+                let platform_name_str = platform_name(&platform);
+                
+                // 获取平台特定的netstat命令
+                let (command, default_args) = get_platform_specific_command(CommandType::NetStat, &platform);
+                
+                // 构建命令参数
+                let mut command_args = default_args.clone();
+                
+                // 根据平台和参数调整命令
+                match platform {
+                    Platform::MacOS => {
+                        // macOS的netstat命令参数
+                        if show_tcp && !show_udp {
+                            command_args.push("-p");
+                            command_args.push("tcp");
+                        } else if show_udp && !show_tcp {
+                            command_args.push("-p");
+                            command_args.push("udp");
+                        }
+                    },
+                    Platform::Linux => {
+                        // Linux的netstat命令参数
+                        if show_tcp && !show_udp {
+                            command_args.push("-t");
+                        } else if show_udp && !show_tcp {
+                            command_args.push("-u");
+                        }
+                    },
+                    Platform::Windows => {
+                        // Windows的netstat命令参数
+                        if show_tcp && !show_udp {
+                            command_args.push("-p");
+                            command_args.push("tcp");
+                        } else if show_udp && !show_tcp {
+                            command_args.push("-p");
+                            command_args.push("udp");
+                        }
+                    },
+                    Platform::Unknown => {
+                        // 未知平台，使用默认参数
+                        if show_tcp && !show_udp {
+                            command_args.push("-p");
+                            command_args.push("tcp");
+                        } else if show_udp && !show_tcp {
+                            command_args.push("-p");
+                            command_args.push("udp");
+                        }
+                    }
                 }
 
-                match execute_command_with_timeout("netstat", &command_args, 15).await {
+                match execute_command_with_timeout(&command, &command_args, 15).await {
                     Ok(output) => {
                         let result = String::from_utf8_lossy(&output.stdout).to_string();
                         let lines: Vec<String> = result.lines().map(|s| s.to_string()).collect();
 
-                        // 简单的连接统计
+                        // 平台特定的连接统计
                         let mut tcp_count = 0;
                         let mut udp_count = 0;
                         let mut listening_count = 0;
                         let mut established_count = 0;
 
                         for line in &lines {
-                            if line.contains("tcp") {
-                                tcp_count += 1;
-                                if line.contains("LISTEN") {
-                                    listening_count += 1;
-                                } else if line.contains("ESTABLISHED") {
-                                    established_count += 1;
+                            match platform {
+                                Platform::MacOS => {
+                                    // macOS netstat输出解析
+                                    if line.contains("tcp") {
+                                        tcp_count += 1;
+                                        if line.contains("LISTEN") {
+                                            listening_count += 1;
+                                        } else if line.contains("ESTABLISHED") {
+                                            established_count += 1;
+                                        }
+                                    } else if line.contains("udp") {
+                                        udp_count += 1;
+                                    }
+                                },
+                                Platform::Linux => {
+                                    // Linux netstat输出解析
+                                    if line.contains("tcp") {
+                                        tcp_count += 1;
+                                        if line.contains("LISTEN") {
+                                            listening_count += 1;
+                                        } else if line.contains("ESTABLISHED") {
+                                            established_count += 1;
+                                        }
+                                    } else if line.contains("udp") {
+                                        udp_count += 1;
+                                    }
+                                },
+                                Platform::Windows => {
+                                    // Windows netstat输出解析
+                                    if line.contains("TCP") {
+                                        tcp_count += 1;
+                                        if line.contains("LISTENING") {
+                                            listening_count += 1;
+                                        } else if line.contains("ESTABLISHED") {
+                                            established_count += 1;
+                                        }
+                                    } else if line.contains("UDP") {
+                                        udp_count += 1;
+                                    }
+                                },
+                                Platform::Unknown => {
+                                    // 未知平台，尝试通用解析
+                                    if line.contains("tcp") || line.contains("TCP") {
+                                        tcp_count += 1;
+                                        if line.contains("LISTEN") || line.contains("LISTENING") {
+                                            listening_count += 1;
+                                        } else if line.contains("ESTABLISHED") {
+                                            established_count += 1;
+                                        }
+                                    } else if line.contains("udp") || line.contains("UDP") {
+                                        udp_count += 1;
+                                    }
                                 }
-                            } else if line.contains("udp") {
-                                udp_count += 1;
                             }
                         }
 
@@ -113,6 +237,11 @@ impl FunctionExecutor for AnalysisExecutor {
                                 },
                                 "show_tcp": show_tcp,
                                 "show_udp": show_udp,
+                                "platform": platform_name_str,
+                                "command": {
+                                    "executable": command,
+                                    "arguments": command_args
+                                },
                                 "success": output.status.success()
                             }),
                             error: if output.status.success() {
@@ -187,63 +316,141 @@ impl AnalysisExecutor {
     ) -> AiResult<serde_json::Value> {
         let mut results = serde_json::Map::new();
 
-        // 基础系统信息
-        if let Ok(output) = execute_command_with_timeout("uptime", &[], 5).await {
+        // 检测当前平台
+        let platform = detect_platform();
+        let platform_name_str = platform_name(&platform);
+
+        // 基础系统信息 - 使用平台特定的uptime命令
+        let (uptime_command, uptime_args) = get_platform_specific_command(CommandType::Uptime, &platform);
+        if let Ok(output) = execute_command_with_timeout(&uptime_command, &uptime_args, 5).await {
             results.insert(
                 "uptime".to_string(),
                 json!({
                     "data": String::from_utf8_lossy(&output.stdout).trim(),
+                    "platform": platform_name_str,
+                    "command": {
+                        "executable": uptime_command,
+                        "arguments": uptime_args
+                    },
                     "success": output.status.success()
                 }),
             );
         }
 
-        // 内存信息
-        if let Ok(output) = execute_command_with_timeout("vm_stat", &[], 5).await {
-            results.insert(
-                "memory".to_string(),
-                json!({
-                    "data": String::from_utf8_lossy(&output.stdout).trim(),
-                    "success": output.status.success()
-                }),
-            );
+        // 内存信息 - 使用平台特定的内存命令
+        let (mem_command, mem_args) = get_platform_specific_command(CommandType::MemInfo, &platform);
+        if let Ok(output) = execute_command_with_timeout(&mem_command, &mem_args, 5).await {
+            let mut mem_result = json!({
+                "data": String::from_utf8_lossy(&output.stdout).trim(),
+                "platform": platform_name_str,
+                "command": {
+                    "executable": mem_command,
+                    "arguments": mem_args
+                },
+                "success": output.status.success()
+            });
+
+            // 如果是macOS，解析vm_stat输出
+            if platform == Platform::MacOS {
+                let output_str = String::from_utf8_lossy(&output.stdout);
+                let parsed_mem = parse_vmstat_output(&output_str);
+                mem_result["parsed"] = json!(parsed_mem);
+            }
+
+            results.insert("memory".to_string(), mem_result);
         }
 
         // 进程信息 (仅在标准模式及以上)
-        if mode != "quick"
-            && let Ok(output) =
-                execute_command_with_timeout("ps", &["aux", "--sort=-%cpu"], 10).await
-        {
-            let cpu_output = String::from_utf8_lossy(&output.stdout);
-            let cpu_lines: Vec<String> =
-                cpu_output.lines().take(11).map(|s| s.to_string()).collect();
+        if mode != "quick" {
+            let (ps_command, mut ps_args) = get_platform_specific_command(CommandType::ProcessList, &platform);
+            
+            // 根据平台添加排序参数
+            match platform {
+                Platform::MacOS => {
+                    ps_args.push("-c");
+                    ps_args.push("-o");
+                    ps_args.push("%cpu,comm");
+                },
+                Platform::Linux => {
+                    ps_args.push("--sort=-%cpu");
+                },
+                Platform::Windows => {
+                    ps_args.push("/fo");
+                    ps_args.push("csv");
+                },
+                Platform::Unknown => {
+                    // 未知平台，尝试通用参数
+                    ps_args.push("--sort=-%cpu");
+                }
+            }
 
-            results.insert(
-                "top_cpu_processes".to_string(),
-                json!({
-                    "data": cpu_lines,
-                    "success": output.status.success()
-                }),
-            );
+            if let Ok(output) = execute_command_with_timeout(&ps_command, &ps_args, 10).await {
+                let cpu_output = String::from_utf8_lossy(&output.stdout);
+                let cpu_lines: Vec<String> = cpu_output.lines().take(11).map(|s| s.to_string()).collect();
+
+                results.insert(
+                    "top_cpu_processes".to_string(),
+                    json!({
+                        "data": cpu_lines,
+                        "platform": platform_name_str,
+                        "command": {
+                            "executable": ps_command,
+                            "arguments": ps_args
+                        },
+                        "success": output.status.success()
+                    }),
+                );
+            }
         }
 
         // I/O统计 (仅在深度模式)
         if mode == "deep" {
-            if let Ok(output) = execute_command_with_timeout("iostat", &["1", "2"], 10).await {
+            // I/O统计
+            let (io_command, mut io_args) = get_platform_specific_command(CommandType::Iostat, &platform);
+            
+            // 根据平台添加参数
+            match platform {
+                Platform::MacOS | Platform::Linux => {
+                    io_args.push("1");
+                    io_args.push("2");
+                },
+                Platform::Windows => {
+                    io_args.push("1");
+                },
+                Platform::Unknown => {
+                    // 未知平台，尝试通用参数
+                    io_args.push("1");
+                    io_args.push("2");
+                }
+            }
+
+            if let Ok(output) = execute_command_with_timeout(&io_command, &io_args, 10).await {
                 results.insert(
                     "io_stats".to_string(),
                     json!({
                         "data": String::from_utf8_lossy(&output.stdout).trim(),
+                        "platform": platform_name_str,
+                        "command": {
+                            "executable": io_command,
+                            "arguments": io_args
+                        },
                         "success": output.status.success()
                     }),
                 );
             }
 
-            if let Ok(output) = execute_command_with_timeout("netstat", &["-an"], 10).await {
+            // 网络统计
+            let (net_command, net_args) = get_platform_specific_command(CommandType::NetStat, &platform);
+            if let Ok(output) = execute_command_with_timeout(&net_command, &net_args, 10).await {
                 results.insert(
                     "network_stats".to_string(),
                     json!({
                         "data": String::from_utf8_lossy(&output.stdout).trim(),
+                        "platform": platform_name_str,
+                        "command": {
+                            "executable": net_command,
+                            "arguments": net_args
+                        },
                         "success": output.status.success()
                     }),
                 );

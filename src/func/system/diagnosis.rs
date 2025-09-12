@@ -6,7 +6,69 @@ use crate::{
     FunctionResult, error::OrionAiReason,
 };
 
-use super::{execute_command_with_timeout, parse_function_arguments};
+use super::{execute_command_with_timeout, parse_function_arguments, detect_platform, get_platform_specific_command, platform_name, CommandType, Platform};
+
+/// 解析 macOS vm_stat 命令输出
+pub fn parse_vmstat_output(output: &str) -> serde_json::Value {
+    let mut memory_info = serde_json::Map::new();
+    let mut page_size = 4096; // 默认页面大小
+    
+    for line in output.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        
+        // 解析页面大小
+        if trimmed.starts_with("Mach Virtual Memory Statistics:") {
+            continue;
+        }
+        
+        if trimmed.starts_with("page size of") {
+            if let Some(size_str) = trimmed.split_whitespace().nth(3) {
+                if let Ok(size) = size_str.parse::<u64>() {
+                    page_size = size;
+                }
+            }
+            continue;
+        }
+        
+        // 解析内存统计信息
+        if let Some(colon_pos) = trimmed.find(':') {
+            let key = trimmed[..colon_pos].trim().to_string();
+            let value_str = trimmed[colon_pos + 1..].trim();
+            
+            // 移除点号并转换为数字
+            let clean_value = value_str.replace('.', "");
+            if let Ok(value) = clean_value.parse::<u64>() {
+                // 将页面数转换为字节
+                let bytes = value * page_size;
+                memory_info.insert(key, json!(bytes));
+            }
+        }
+    }
+    
+    // 计算总内存和使用内存
+    if let (Some(free), Some(active), Some(inactive), Some(wire)) = (
+        memory_info.get("Pages free").and_then(|v| v.as_u64()),
+        memory_info.get("Pages active").and_then(|v| v.as_u64()),
+        memory_info.get("Pages inactive").and_then(|v| v.as_u64()),
+        memory_info.get("Pages wired").and_then(|v| v.as_u64()),
+    ) {
+        let total = free + active + inactive + wire;
+        let used = active + inactive + wire;
+        let free_percent = (free as f64 / total as f64) * 100.0;
+        let used_percent = (used as f64 / total as f64) * 100.0;
+        
+        memory_info.insert("total_memory".to_string(), json!(total));
+        memory_info.insert("used_memory".to_string(), json!(used));
+        memory_info.insert("free_memory".to_string(), json!(free));
+        memory_info.insert("free_percent".to_string(), json!(format!("{:.2}%", free_percent)));
+        memory_info.insert("used_percent".to_string(), json!(format!("{:.2}%", used_percent)));
+    }
+    
+    serde_json::Value::Object(memory_info)
+}
 
 // 系统诊断函数执行器
 pub struct DiagnosisExecutor;
@@ -22,9 +84,33 @@ impl FunctionExecutor for DiagnosisExecutor {
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
 
-                let command_args = if detailed { vec!["-a"] } else { vec![] };
+                // 检测当前平台并获取平台特定命令
+                let platform = detect_platform();
+                let (command, default_args) = get_platform_specific_command(CommandType::Uptime, &platform);
+                
+                // 构建命令参数
+                let mut command_args = default_args.clone();
+                
+                // 根据detailed参数调整命令
+                if detailed {
+                    match platform {
+                        Platform::MacOS => {
+                            command_args.push("-v");
+                        },
+                        Platform::Linux => {
+                            command_args.push("-p");
+                        },
+                        Platform::Windows => {
+                            // Windows uptime命令不支持详细参数
+                        },
+                        Platform::Unknown => {
+                            // 未知平台，尝试添加详细参数
+                            command_args.push("-v");
+                        }
+                    }
+                }
 
-                match execute_command_with_timeout("uptime", &command_args, 5).await {
+                match execute_command_with_timeout(&command, &command_args.iter().map(|s| s.as_ref()).collect::<Vec<&str>>(), 5).await {
                     Ok(output) => {
                         let result = String::from_utf8_lossy(&output.stdout).to_string();
                         Ok(FunctionResult {
@@ -32,7 +118,9 @@ impl FunctionExecutor for DiagnosisExecutor {
                             result: json!({
                                 "output": result.trim(),
                                 "detailed": detailed,
-                                "success": output.status.success()
+                                "success": output.status.success(),
+                                "platform": platform_name(&platform),
+                                "command": format!("{} {}", command, command_args.join(" "))
                             }),
                             error: if output.status.success() {
                                 None
@@ -49,29 +137,89 @@ impl FunctionExecutor for DiagnosisExecutor {
                 }
             }
 
-            "sys-meminfo" => match execute_command_with_timeout("vm_stat", &[], 5).await {
-                Ok(output) => {
-                    let result = String::from_utf8_lossy(&output.stdout).to_string();
-                    let lines: Vec<String> = result.lines().map(|s| s.to_string()).collect();
+            "sys-meminfo" => {
+                let args = parse_function_arguments(&function_call.function.arguments)?;
+                let detailed = args
+                    .get("detailed")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
 
-                    Ok(FunctionResult {
-                        name: "sys-meminfo".to_string(),
-                        result: json!({
-                            "memory_info": lines,
-                            "success": output.status.success()
-                        }),
-                        error: if output.status.success() {
-                            None
-                        } else {
-                            Some(String::from_utf8_lossy(&output.stderr).to_string())
+                // 检测当前平台并获取平台特定命令
+                let platform = detect_platform();
+                let (command, default_args) = get_platform_specific_command(CommandType::MemInfo, &platform);
+                
+                // 构建命令参数
+                let mut command_args = default_args.clone();
+                
+                // 根据detailed参数调整命令
+                if detailed {
+                    match platform {
+                        Platform::MacOS => {
+                            command_args.push("-w");
                         },
-                    })
+                        Platform::Linux => {
+                            command_args.push("-h");
+                        },
+                        Platform::Windows => {
+                            // Windows meminfo命令不支持详细参数
+                        },
+                        Platform::Unknown => {
+                            // 未知平台，尝试添加详细参数
+                            command_args.push("-h");
+                        }
+                    }
                 }
-                Err(e) => Ok(FunctionResult {
-                    name: "sys-meminfo".to_string(),
-                    result: serde_json::Value::Null,
-                    error: Some(format!("Failed to get memory info: {}", e)),
-                }),
+
+                match execute_command_with_timeout(&command, &command_args.iter().map(|s| s.as_ref()).collect::<Vec<&str>>(), 5).await {
+                    Ok(output) => {
+                        let result = String::from_utf8_lossy(&output.stdout).to_string();
+                        
+                        // 根据平台解析输出
+                        let parsed_result = match platform {
+                            Platform::MacOS => parse_vmstat_output(&result),
+                            Platform::Linux => {
+                                // 对于 Linux，简单返回原始输出，因为 free 命令的输出已经比较友好
+                                let lines: Vec<String> = result.lines().map(|s| s.to_string()).collect();
+                                json!({
+                                    "memory_info": lines,
+                                    "platform": platform_name(&platform),
+                                    "command": format!("{} {}", command, command_args.join(" "))
+                                })
+                            }
+                            Platform::Windows => {
+                                // 对于 Windows，简单返回原始输出
+                                let lines: Vec<String> = result.lines().map(|s| s.to_string()).collect();
+                                json!({
+                                    "memory_info": lines,
+                                    "platform": platform_name(&platform),
+                                    "command": format!("{} {}", command, command_args.join(" "))
+                                })
+                            }
+                            Platform::Unknown => {
+                                json!({
+                                    "raw_output": result.trim(),
+                                    "platform": platform_name(&platform),
+                                    "command": format!("{} {}", command, command_args.join(" "))
+                                })
+                            }
+                        };
+                        
+                        Ok(FunctionResult {
+                            name: "sys-meminfo".to_string(),
+                            result: parsed_result,
+                            error: if output.status.success() {
+                                None
+                            } else {
+                                Some(String::from_utf8_lossy(&output.stderr).to_string())
+                            },
+                        })
+                    }
+                    Err(e) => Ok(FunctionResult {
+                        name: "sys-meminfo".to_string(),
+                        result: serde_json::Value::Null,
+                        error: Some(format!("Failed to get memory info: {}", e)),
+                    }),
+                }
             },
 
             _ => Err(OrionAiReason::from_logic("Unknown diagnosis function".to_string()).to_err()),

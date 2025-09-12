@@ -23,20 +23,60 @@ impl FunctionExecutor for MonitorExecutor {
                     .unwrap_or("cpu");
                 let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
 
-                let mut command_args = vec!["aux"];
-
-                // 添加排序参数
-                match sort_by {
-                    "cpu" => command_args.push("--sort=-%cpu"),
-                    "memory" | "mem" => command_args.push("--sort=-%mem"),
-                    _ => command_args.push("--sort=-%cpu"),
+                // 根据操作系统选择不同的命令参数
+                let command_args = vec!["aux"];
+                
+                // 检查操作系统类型
+                #[cfg(target_os = "macos")]
+                {
+                    // macOS系统不支持--sort参数，使用不同的方式
+                    // 在macOS上，我们获取所有进程然后在代码中排序
+                }
+                
+                #[cfg(not(target_os = "macos"))]
+                {
+                    // 非macOS系统（如Linux）使用--sort参数
+                    match sort_by {
+                        "cpu" => command_args.push("--sort=-%cpu"),
+                        "memory" | "mem" => command_args.push("--sort=-%mem"),
+                        _ => command_args.push("--sort=-%cpu"),
+                    }
                 }
 
                 match execute_command_with_timeout("ps", &command_args, 15).await {
                     Ok(output) => {
                         let result = String::from_utf8_lossy(&output.stdout).to_string();
-                        let lines: Vec<String> = result.lines().map(|s| s.to_string()).collect();
-
+                        let mut lines: Vec<String> = result.lines().map(|s| s.to_string()).collect();
+                        
+                        // 在macOS上，我们需要手动排序
+                        #[cfg(target_os = "macos")]
+                        {
+                            if lines.len() > 1 {
+                                let header = lines.remove(0);
+                                let mut processes: Vec<(String, f64)> = Vec::new();
+                                
+                                for line in lines {
+                                    let parts: Vec<&str> = line.split_whitespace().collect();
+                                    if parts.len() >= 3 {
+                                        let cpu_percent = parts[2].parse::<f64>().unwrap_or(0.0);
+                                        let mem_percent = parts[3].parse::<f64>().unwrap_or(0.0);
+                                        let sort_value = match sort_by {
+                                            "memory" | "mem" => mem_percent,
+                                            _ => cpu_percent,
+                                        };
+                                        processes.push((line, sort_value));
+                                    }
+                                }
+                                
+                                // 根据指定的字段排序
+                                processes.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                                
+                                // 重新构建结果列表
+                                lines = vec![header];
+                                lines.extend(processes.into_iter().take(limit).map(|(line, _)| line));
+                            }
+                        }
+                        
                         // 应用limit限制
                         let limited_lines = if lines.len() > limit + 1 {
                             // +1 for header
@@ -69,40 +109,88 @@ impl FunctionExecutor for MonitorExecutor {
             }
 
             "sys-proc-stats" => {
-                match execute_command_with_timeout("ps", &["axo", "pid,stat,comm"], 10).await {
-                    Ok(output) => {
-                        let result = String::from_utf8_lossy(&output.stdout).to_string();
-                        let lines: Vec<String> = result.lines().map(|s| s.to_string()).collect();
+                // 根据操作系统选择不同的命令参数
+                #[cfg(target_os = "macos")]
+                {
+                    // macOS系统使用不同的ps命令格式
+                    match execute_command_with_timeout("ps", &["ax"], 10).await {
+                        Ok(output) => {
+                            let result = String::from_utf8_lossy(&output.stdout).to_string();
+                            let lines: Vec<String> = result.lines().map(|s| s.to_string()).collect();
 
-                        // 统计进程状态
-                        let mut stats = std::collections::HashMap::new();
-                        for line in lines.iter().skip(1) {
-                            // skip header
-                            if let Some(status_char) = line.chars().next() {
-                                *stats.entry(status_char.to_string()).or_insert(0) += 1;
+                            // 统计进程状态
+                            let mut stats = std::collections::HashMap::new();
+                            for line in lines.iter().skip(1) {
+                                // skip header
+                                let parts: Vec<&str> = line.split_whitespace().collect();
+                                if parts.len() > 2 {
+                                    if let Some(status_char) = parts[2].chars().next() {
+                                        *stats.entry(status_char.to_string()).or_insert(0) += 1;
+                                    }
+                                }
                             }
-                        }
 
-                        Ok(FunctionResult {
+                            Ok(FunctionResult {
+                                name: "sys-proc-stats".to_string(),
+                                result: json!({
+                                    "process_lines": lines,
+                                    "status_stats": stats,
+                                    "total_processes": lines.len().saturating_sub(1), // exclude header
+                                    "success": output.status.success()
+                                }),
+                                error: if output.status.success() {
+                                    None
+                                } else {
+                                    Some(String::from_utf8_lossy(&output.stderr).to_string())
+                                },
+                            })
+                        }
+                        Err(e) => Ok(FunctionResult {
                             name: "sys-proc-stats".to_string(),
-                            result: json!({
-                                "process_lines": lines,
-                                "status_stats": stats,
-                                "total_processes": lines.len().saturating_sub(1), // exclude header
-                                "success": output.status.success()
-                            }),
-                            error: if output.status.success() {
-                                None
-                            } else {
-                                Some(String::from_utf8_lossy(&output.stderr).to_string())
-                            },
-                        })
+                            result: serde_json::Value::Null,
+                            error: Some(format!("Failed to get process stats: {}", e)),
+                        }),
                     }
-                    Err(e) => Ok(FunctionResult {
-                        name: "sys-proc-stats".to_string(),
-                        result: serde_json::Value::Null,
-                        error: Some(format!("Failed to get process stats: {}", e)),
-                    }),
+                }
+                
+                #[cfg(not(target_os = "macos"))]
+                {
+                    // 非macOS系统（如Linux）使用原命令格式
+                    match execute_command_with_timeout("ps", &["axo", "pid,stat,comm"], 10).await {
+                        Ok(output) => {
+                            let result = String::from_utf8_lossy(&output.stdout).to_string();
+                            let lines: Vec<String> = result.lines().map(|s| s.to_string()).collect();
+
+                            // 统计进程状态
+                            let mut stats = std::collections::HashMap::new();
+                            for line in lines.iter().skip(1) {
+                                // skip header
+                                if let Some(status_char) = line.chars().next() {
+                                    *stats.entry(status_char.to_string()).or_insert(0) += 1;
+                                }
+                            }
+
+                            Ok(FunctionResult {
+                                name: "sys-proc-stats".to_string(),
+                                result: json!({
+                                    "process_lines": lines,
+                                    "status_stats": stats,
+                                    "total_processes": lines.len().saturating_sub(1), // exclude header
+                                    "success": output.status.success()
+                                }),
+                                error: if output.status.success() {
+                                    None
+                                } else {
+                                    Some(String::from_utf8_lossy(&output.stderr).to_string())
+                                },
+                            })
+                        }
+                        Err(e) => Ok(FunctionResult {
+                            name: "sys-proc-stats".to_string(),
+                            result: serde_json::Value::Null,
+                            error: Some(format!("Failed to get process stats: {}", e)),
+                        }),
+                    }
                 }
             }
 
